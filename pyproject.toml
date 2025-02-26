@@ -1,0 +1,21 @@
+[project]
+authors = [
+    {name = "oasci", email = "us@oasci.org"}
+]
+description = "Parallelism, Delegated"
+name = "raygent"
+version = "0.0.0"
+readme = "README.md"
+requires-python = ">=3.12"
+
+# TODO: Keep this here until pixi releases building capabilities
+dependencies = [
+    "loguru>=0.7.2,<0.8",
+]
+
+[build-system]
+requires = ["setuptools"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["raygent*"]
