@@ -1,7 +1,7 @@
 from typing import Any, Generator
 
 from collections.abc import Callable
-from raygen.worker import ray_worker
+from raygent.worker import ray_worker
 
 import ray
 
