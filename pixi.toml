@@ -83,4 +83,4 @@ mkdocs-awesome-nav = ">=3.0.0, <4"
 
 [feature.docs.tasks]
 docs = { cmd = ["rm", "-rf", "./public/", "&&", "mkdocs", "build", "-d", "public/"] }
-serve = { cmd = ["mkdocs", "serve"] }
+serve-docs = { cmd = ["mkdocs", "serve"] }
