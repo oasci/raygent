@@ -1,3 +1,13 @@
 nav:
   - Home: index.md
+  - Tasks: tasks.md
+  - Manager: manager.md
+  - examples
   - API: api
+
+sort:
+  type: natural
+  ignore_case: true
+  by: title
+  direction: asc
+flatten_single_child_sections: true

@@ -98,6 +98,7 @@ class RayManager:
         chunk_size: int = 100,
         save_func: Callable[..., None] | None = None,
         save_kwargs: dict[str, Any] = dict(),
+        at_once: bool = False,
         save_interval: int = 100,
     ) -> None:
         """Submits tasks using a generator and manages workers up to n_cores.
@@ -106,6 +107,8 @@ class RayManager:
             items: A list of items to process.
             chunk_size: Number of items per chunk.
             save_func: A callable that takes a list of results and saves them.
+            at_once : If `True`, calls `process_items` to process all
+                items at once; otherwise, processes them individually.
             save_interval: The number of results after which to invoke save_func.
         """
         self.save_func = save_func
@@ -119,15 +122,19 @@ class RayManager:
         else:
             self._submit(task_gen)
 
-    def _submit(self, task_gen: Generator[Any, None, None]) -> None:
+    def _submit(
+        self, task_gen: Generator[Any, None, None], at_once: bool = False
+    ) -> None:
         """Handles task submission and result collection sequentially.
 
         Args:
             task_gen: Generator yielding tasks to process.
+            at_once : If `True`, calls `process_items` to process all
+                items at once; otherwise, processes them individually.
         """
         results = []
         for chunk in task_gen:
-            results_chunk = self.task_class().run(chunk)
+            results_chunk = self.task_class().run(chunk, at_once=at_once)
             results.extend(results_chunk)
 
             if self.save_func and len(results) >= self.save_interval:
