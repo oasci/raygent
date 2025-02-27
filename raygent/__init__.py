@@ -7,9 +7,9 @@ from typing import Any
 
 from loguru import logger
 
-from raygent.manager import RayManager
-from raygent.task import RayTask
-from raygent.worker import ray_worker
+from .manager import RayManager
+from .task import RayTask
+from .worker import ray_worker
 
 __all__ = ["RayManager", "RayTask", "ray_worker"]
 
