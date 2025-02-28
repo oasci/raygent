@@ -1,8 +1,8 @@
 # Manager
 
-[`RayManager`][manager.RayManager] is a class designed to efficiently manage task execution using **Ray's Task Parallelism**.
+[`TaskManager`][manager.TaskManager] is a class designed to efficiently manage task execution using **Ray's Task Parallelism**.
 It allows for seamless parallel execution of tasks while also supporting sequential execution when Ray is disabled.
-By handling task submission, worker management, and result collection, [`RayManager`][manager.RayManager] simplifies distributed processing workflows.
+By handling task submission, worker management, and result collection, [`TaskManager`][manager.TaskManager] simplifies distributed processing workflows.
 Some key features include:
 
 -   **Flexible Execution Modes**: Runs tasks either sequentially or in parallel using Ray.
@@ -13,18 +13,18 @@ Some key features include:
 
 ## Initialization
 
-The [`RayManager`][manager.RayManager] constructor initializes the execution environment and prepares task handling.
+The [`TaskManager`][manager.TaskManager] constructor initializes the execution environment and prepares task handling.
 
 ```python
-from raygent.manager import RayManager
+from raygent.manager import TaskManager
 from my_tasks import ExampleTask
 
-ray_manager = RayManager(ExampleTask, n_cores=4, use_ray=True)
+ray_manager = TaskManager(ExampleTask, n_cores=4, use_ray=True)
 ```
 
 ## Submitting Tasks
 
-Tasks are submitted using [`submit_tasks`][manager.RayManager.submit_tasks], which divides data into chunks and manages workers efficiently.
+Tasks are submitted using [`submit_tasks`][manager.TaskManager.submit_tasks], which divides data into chunks and manages workers efficiently.
 
 ```python
 ray_manager.submit_tasks(

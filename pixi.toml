@@ -39,6 +39,8 @@ pytest-html = ">=4.0.1"
 colorama = ">=0.4.6"
 numpy = ">=2.2.3,<3"
 jupyterlab = ">=4.3.5,<5"
+zarr = ">=3.0.4,<4"
+h5py = ">=3.13.0,<4"
 
 [feature.dev.tasks]
 mdlint = { cmd = ["markdownlint-cli2", '"**/*.{md,markdown}"', "--fix", "--config", ".markdownlint.yaml", "||", "true"] }

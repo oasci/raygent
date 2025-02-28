@@ -2,11 +2,12 @@ from typing import Any, Generator
 
 from collections.abc import Callable
 from raygent.worker import ray_worker
+from raygent.savers import Saver
 
 import ray
 
 
-class RayManager:
+class TaskManager:
     """
     A manager class for handling task submissions and result collection using Ray's Task Parallelism.
     """
@@ -14,7 +15,7 @@ class RayManager:
     def __init__(
         self, task_class: Callable[[], Any], n_cores: int = -1, use_ray: bool = False
     ) -> None:
-        """Initializes the RayManager.
+        """Initializes the TaskManager.
 
         Args:
             task_class: A callable that returns an instance with a `run` method for
@@ -30,7 +31,7 @@ class RayManager:
 
         self.use_ray = use_ray
         """
-        Flag to determine if Ray should be used. If False, runs tasks sequentially.
+        Flag to determine if Ray should be used. If `False`, runs tasks sequentially.
         """
 
         self.n_cores = (
@@ -53,9 +54,9 @@ class RayManager:
         output returned by each worker.
         """
 
-        self.save_func: Callable[..., None] | None = None
+        self.saver: Saver | None = None
         """
-        An optional callable function that takes a batch of results and performs a
+        An optional Saver that takes a batch of results and performs a
         save operation. This can be used to persist intermediate results to
         disk, a database, or any other storage medium. If set to `None`, results are
         not saved automatically.
@@ -71,9 +72,9 @@ class RayManager:
         self.save_kwargs: dict[str, Any] = dict()
         """
         A dictionary of additional keyword arguments to pass to
-        `save_func` when it is called. This allows for flexible configuration of the
+        `save` when it is called. This allows for flexible configuration of the
         save operation, such as specifying file paths,
-        database connections, or other parameters required by `save_func`.
+        database connections, or other parameters required by `save`.
         """
 
     def task_generator(
@@ -96,8 +97,7 @@ class RayManager:
         self,
         items: list[Any],
         chunk_size: int = 100,
-        save_func: Callable[..., None] | None = None,
-        save_kwargs: dict[str, Any] = dict(),
+        saver: Saver | None = None,
         at_once: bool = False,
         save_interval: int = 100,
     ) -> None:
@@ -107,12 +107,11 @@ class RayManager:
             items: A list of items to process.
             chunk_size: Number of items per chunk.
             save_func: A callable that takes a list of results and saves them.
-            at_once : If `True`, calls `process_items` to process all
+            at_once: If `True`, calls `process_items` to process all
                 items at once; otherwise, processes them individually.
             save_interval: The number of results after which to invoke save_func.
         """
-        self.save_func = save_func
-        self.save_kwargs = save_kwargs
+        self.saver = saver
         self.save_interval = save_interval
 
         task_gen = self.task_generator(items, chunk_size)
@@ -129,7 +128,7 @@ class RayManager:
 
         Args:
             task_gen: Generator yielding tasks to process.
-            at_once : If `True`, calls `process_items` to process all
+            at_once: If `True`, calls `process_items` to process all
                 items at once; otherwise, processes them individually.
         """
         results = []
@@ -137,14 +136,13 @@ class RayManager:
             results_chunk = self.task_class().run(chunk, at_once=at_once)
             results.extend(results_chunk)
 
-            if self.save_func and len(results) >= self.save_interval:
-                if self.save_func is not None:
-                    self.save_func(results[: self.save_interval], **self.save_kwargs)
-                self.results.extend(results)
+            if self.saver and len(results) >= self.save_interval:
+                self.saver.save(results[: self.save_interval], **self.save_kwargs)
+                self.results.extend(results[: self.save_interval])
                 results = results[self.save_interval :]
 
-        if self.save_func and len(results) > 0:
-            self.save_func(results, **self.save_kwargs)
+        if self.saver and len(results) > 0:
+            self.saver.save(results, **self.save_kwargs)
         self.results.extend(results)
 
     def _submit_ray(self, task_gen: Generator[Any, None, None]) -> None:
@@ -164,9 +162,9 @@ class RayManager:
                 results_chunk = ray.get(done_futures[0])
                 results.extend(results_chunk)
 
-                if self.save_func and len(results) >= self.save_interval:
-                    self.save_func(results[: self.save_interval], **self.save_kwargs)
-                    self.results.extend(results)
+                if self.saver and len(results) >= self.save_interval:
+                    self.saver.save(results[: self.save_interval], **self.save_kwargs)
+                    self.results.extend(results[: self.save_interval])
                     results = results[self.save_interval :]
 
             # Submit new task to Ray
@@ -179,13 +177,13 @@ class RayManager:
             results_chunk = ray.get(done_futures[0])
             results.extend(results_chunk)
 
-            if self.save_func and len(results) >= self.save_interval:
-                self.save_func(results[: self.save_interval], **self.save_kwargs)
-                self.results.extend(results)
+            if self.saver and len(results) >= self.save_interval:
+                self.saver.save(results[: self.save_interval], **self.save_kwargs)
+                self.results.extend(results[: self.save_interval])
                 results = results[self.save_interval :]
 
-        if self.save_func and results:
-            self.save_func(results, **self.save_kwargs)
+        if self.saver and results:
+            self.saver.save(results, **self.save_kwargs)
         self.results.extend(results)
 
     def get_results(self) -> list[Any]:

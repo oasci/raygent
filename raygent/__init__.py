@@ -7,11 +7,11 @@ from typing import Any
 
 from loguru import logger
 
-from raygent.manager import RayManager
-from raygent.task import RayTask
+from raygent.manager import TaskManager
+from raygent.task import Task
 from raygent.worker import ray_worker
 
-__all__ = ["RayManager", "RayTask", "ray_worker"]
+__all__ = ["TaskManager", "Task", "ray_worker"]
 
 logger.disable("raygent")
 

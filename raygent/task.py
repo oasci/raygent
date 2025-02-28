@@ -4,7 +4,7 @@ from abc import ABC
 from loguru import logger
 
 
-class RayTask(ABC):
+class Task(ABC):
     """Abstract base class for executing computational tasks on a collection of items.
 
     This class provides a structured way to process individual or multiple items using
@@ -13,7 +13,7 @@ class RayTask(ABC):
 
     Example:
         ```python
-        >>> class MyTask(RayTask):
+        >>> class MyTask(Task):
         ...     def process_item(self, item):
         ...         return item * 2
         ...
@@ -33,8 +33,8 @@ class RayTask(ABC):
         Errors encountered during processing are logged and captured in the results.
 
         Args:
-            items : A list of input data items to be processed.
-            at_once : If `True`, calls `process_items` to process all
+            items: A list of input data items to be processed.
+            at_once: If `True`, calls `process_items` to process all
                 items at once; otherwise, processes them individually.
 
         Returns:
@@ -47,7 +47,7 @@ class RayTask(ABC):
 
         Example:
             ```python
-            >>> class SquareTask(RayTask):
+            >>> class SquareTask(Task):
             ...     def process_item(self, item):
             ...         return item ** 2
             ...     def process_items(self, items):
@@ -82,7 +82,7 @@ class RayTask(ABC):
         logic for an individual item.
 
         Args:
-            item : The input data to be processed.
+            item: The input data to be processed.
 
         Returns:
             The processed result.
@@ -92,7 +92,7 @@ class RayTask(ABC):
 
         Example:
             ```python
-            >>> class DoubleTask(RayTask):
+            >>> class DoubleTask(Task):
             ...     def process_item(self, item):
             ...         return item * 2
             ...
@@ -109,7 +109,7 @@ class RayTask(ABC):
         This method must be implemented by subclasses to define the batch processing logic.
 
         Args:
-            items : A list of input data items to be processed.
+            items: A list of input data items to be processed.
 
         Returns:
             The processed result.
@@ -119,7 +119,7 @@ class RayTask(ABC):
 
         Example:
             ```python
-            >>> class DoubleTask(RayTask):
+            >>> class DoubleTask(Task):
             ...     def process_items(self, items):
             ...         return [item * 2 for item in items]
             ...
