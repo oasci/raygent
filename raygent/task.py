@@ -23,7 +23,7 @@ class Task(ABC):
         ```
     """
 
-    def run(self, items: list[Any], at_once: bool = False) -> list[Any]:
+    def run(self, items: list[Any], at_once: bool = False, **kwargs: dict[str, Any]) -> list[Any]:
         """Processes a list of items using the appropriate method.
 
         This method attempts to process each item individually using `process_item`
@@ -64,18 +64,18 @@ class Task(ABC):
         """
         results = []
         if at_once:
-            results = self.process_items(items)
+            results = self.process_items(items, **kwargs)
         else:
             for item in items:
                 try:
-                    result = self.process_item(item)
+                    result = self.process_item(item, **kwargs)
                     results.append(result)
                 except Exception as e:
                     logger.exception(f"Error processing item {item}: {e}")
                     results.append(("error", str(e)))
         return results
 
-    def process_item(self, item: Any) -> Any:
+    def process_item(self, item: Any, **kwargs: dict[str, Any]) -> Any:
         """Processes a single item.
 
         This method must be implemented by subclasses to define the computation
@@ -103,7 +103,7 @@ class Task(ABC):
         """
         raise NotImplementedError
 
-    def process_items(self, items: list[Any]) -> Any:
+    def process_items(self, items: list[Any], **kwargs: dict[str, Any]) -> Any:
         """Processes multiple items at once.
 
         This method must be implemented by subclasses to define the batch processing logic.
