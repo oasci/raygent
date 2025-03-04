@@ -42,7 +42,7 @@ class TaskManager:
         equal to `0`, all available CPU cores are utilized.
         """
 
-        self.futures: list[ray.ObjectRef] = []
+        self.futures: list[ray.ObjectRef] = []  # type: ignore
         """
         A list of Ray object references representing the currently submitted but
         not yet completed tasks. This manages the pool of active workers.
