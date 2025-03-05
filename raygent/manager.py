@@ -100,6 +100,7 @@ class TaskManager:
         saver: Saver | None = None,
         at_once: bool = False,
         save_interval: int = 100,
+        kwargs_task: dict[str, Any] = dict(),
     ) -> None:
         """Submits tasks using a generator and manages workers up to n_cores.
 
@@ -110,6 +111,7 @@ class TaskManager:
             at_once: If `True`, calls `process_items` to process all
                 items at once; otherwise, processes them individually.
             save_interval: The number of results after which to invoke save_func.
+            kwargs_task: Keyword arguments to pass into the task.
         """
         self.saver = saver
         self.save_interval = save_interval
@@ -122,7 +124,10 @@ class TaskManager:
             self._submit(task_gen)
 
     def _submit(
-        self, task_gen: Generator[Any, None, None], at_once: bool = False
+        self,
+        task_gen: Generator[Any, None, None],
+        at_once: bool = False,
+        kwargs_task: dict[str, Any] = dict(),
     ) -> None:
         """Handles task submission and result collection sequentially.
 
@@ -130,10 +135,11 @@ class TaskManager:
             task_gen: Generator yielding tasks to process.
             at_once: If `True`, calls `process_items` to process all
                 items at once; otherwise, processes them individually.
+            kwargs_task: Keyword arguments to pass into the task.
         """
         results = []
         for chunk in task_gen:
-            results_chunk = self.task_class().run(chunk, at_once=at_once)
+            results_chunk = self.task_class().run(chunk, at_once=at_once, **kwargs_task)
             results.extend(results_chunk)
 
             if self.saver and len(results) >= self.save_interval:
@@ -145,11 +151,16 @@ class TaskManager:
             self.saver.save(results, **self.save_kwargs)
         self.results.extend(results)
 
-    def _submit_ray(self, task_gen: Generator[Any, None, None]) -> None:
+    def _submit_ray(
+        self,
+        task_gen: Generator[Any, None, None],
+        kwargs_task: dict[str, Any] = dict(),
+    ) -> None:
         """Handles task submission and result collection using Ray.
 
         Args:
             task_gen: Generator yielding tasks to process.
+            kwargs_task: Keyword arguments to pass into the task.
         """
         if not ray.is_initialized():
             ray.init()

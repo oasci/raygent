@@ -23,7 +23,9 @@ class Task(ABC):
         ```
     """
 
-    def run(self, items: list[Any], at_once: bool = False, **kwargs: dict[str, Any]) -> list[Any]:
+    def run(
+        self, items: list[Any], at_once: bool = False, **kwargs: dict[str, Any]
+    ) -> list[Any]:
         """Processes a list of items using the appropriate method.
 
         This method attempts to process each item individually using `process_item`
