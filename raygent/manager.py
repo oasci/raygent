@@ -34,9 +34,7 @@ class TaskManager:
         Flag to determine if Ray should be used. If `False`, runs tasks sequentially.
         """
 
-        self.n_cores = (
-            n_cores if n_cores > 0 else int(ray.available_resources().get("CPU", 1))
-        )
+        self.n_cores = n_cores
         """
         The number of parallel tasks to run. If set to `-1` or any value less than or
         equal to `0`, all available CPU cores are utilized.
@@ -119,9 +117,9 @@ class TaskManager:
         task_gen = self.task_generator(items, chunk_size)
 
         if self.use_ray:
-            self._submit_ray(task_gen)
+            self._submit_ray(task_gen, at_once, kwargs_task)
         else:
-            self._submit(task_gen)
+            self._submit(task_gen, at_once, kwargs_task)
 
     def _submit(
         self,
@@ -154,16 +152,22 @@ class TaskManager:
     def _submit_ray(
         self,
         task_gen: Generator[Any, None, None],
+        at_once: bool = False,
         kwargs_task: dict[str, Any] = dict(),
     ) -> None:
         """Handles task submission and result collection using Ray.
 
         Args:
             task_gen: Generator yielding tasks to process.
+            at_once: If `True`, calls `process_items` to process all
+                items at once; otherwise, processes them individually.
             kwargs_task: Keyword arguments to pass into the task.
         """
         if not ray.is_initialized():
             ray.init()
+
+        if self.n_cores < 0:
+            self.n_cores = int(ray.available_resources().get("CPU", 1))
 
         results = []
         for chunk in task_gen:
@@ -179,7 +183,7 @@ class TaskManager:
                     results = results[self.save_interval :]
 
             # Submit new task to Ray
-            future = ray_worker.remote(self.task_class, chunk)
+            future = ray_worker.remote(self.task_class, chunk, **kwargs_task)
             self.futures.append(future)
 
         # Collect remaining Ray futures
