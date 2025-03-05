@@ -9,6 +9,7 @@ import ray
 def ray_worker(
     task_class: Callable[[], Any],
     chunk: list[Any],
+    at_once: bool,
     *args: tuple[Any],
     **kwargs: dict[str, Any],
 ) -> Any:
@@ -23,5 +24,5 @@ def ray_worker(
         Any: The result of the `run` method or an error tuple.
     """
     task_instance = task_class()
-    result = task_instance.run(chunk, *args, **kwargs)
+    result = task_instance.run(chunk, at_once, *args, **kwargs)
     return result

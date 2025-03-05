@@ -42,7 +42,7 @@ class TaskManager:
 
         self.n_cores = n_cores
         """
-        The number of parallel tasks to run. If set to `-1` or any value less than or
+        The total number of cores available. If set to `-1` or any value less than or
         equal to `0`, all available CPU cores are utilized.
         """
 
@@ -91,7 +91,7 @@ class TaskManager:
         """
         Maximum number of concurrent tasks if using ray.
         """
-        return max(1, int(self.n_cores_worker // self.n_cores))
+        return max(1, int(self.n_cores // self.n_cores_worker))
 
     def task_generator(
         self, items: list[Any], chunk_size: int
@@ -211,7 +211,7 @@ class TaskManager:
             # Submit new task to Ray
             future = ray_worker.options(
                 num_cpus=self.n_cores_worker, **kwargs_remote
-            ).remote(self.task_class, chunk, **kwargs_task)
+            ).remote(self.task_class, chunk, at_once, **kwargs_task)
             self.futures.append(future)
 
         # Collect remaining Ray futures
