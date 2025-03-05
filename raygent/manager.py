@@ -1,10 +1,11 @@
 from typing import Any, Generator
 
 from collections.abc import Callable
-from raygent.worker import ray_worker
-from raygent.savers import Saver
 
 import ray
+
+from raygent.savers import Saver
+from raygent.worker import ray_worker
 
 
 class TaskManager:
@@ -13,7 +14,11 @@ class TaskManager:
     """
 
     def __init__(
-        self, task_class: Callable[[], Any], n_cores: int = -1, use_ray: bool = False
+        self,
+        task_class: Callable[[], Any],
+        n_cores: int = -1,
+        use_ray: bool = False,
+        n_cores_worker: int = 1,
     ) -> None:
         """Initializes the TaskManager.
 
@@ -22,6 +27,7 @@ class TaskManager:
                 processing each item.
             n_cores: Number of parallel tasks to run. If <= 0, uses all available CPUs.
             use_ray: Flag to determine if Ray should be used. If False, runs tasks sequentially.
+            n_cores_worker: The number of cores allocated for each worker.
         """
         self.task_class = task_class
         """
@@ -38,6 +44,11 @@ class TaskManager:
         """
         The number of parallel tasks to run. If set to `-1` or any value less than or
         equal to `0`, all available CPU cores are utilized.
+        """
+
+        self.n_cores_worker = n_cores_worker
+        """
+        The number of cores allocated for each worker.
         """
 
         self.futures: list[ray.ObjectRef] = []  # type: ignore
@@ -75,6 +86,13 @@ class TaskManager:
         database connections, or other parameters required by `save`.
         """
 
+    @property
+    def max_concurrent_tasks(self) -> int:
+        """
+        Maximum number of concurrent tasks if using ray.
+        """
+        return max(1, int(self.n_cores_worker // self.n_cores))
+
     def task_generator(
         self, items: list[Any], chunk_size: int
     ) -> Generator[Any, None, None]:
@@ -99,6 +117,7 @@ class TaskManager:
         at_once: bool = False,
         save_interval: int = 100,
         kwargs_task: dict[str, Any] = dict(),
+        kwargs_remote: dict[str, Any] = dict(),
     ) -> None:
         """Submits tasks using a generator and manages workers up to n_cores.
 
@@ -110,6 +129,9 @@ class TaskManager:
                 items at once; otherwise, processes them individually.
             save_interval: The number of results after which to invoke save_func.
             kwargs_task: Keyword arguments to pass into the task.
+            kwargs_remote: Keyword arguments to pass into `ray.remote` options.
+                `num_cpus` should not be included here, but set by changing
+                [`TaskManager.n_cores_worker`][manager.TaskManager.n_cores_worker].
         """
         self.saver = saver
         self.save_interval = save_interval
@@ -117,7 +139,7 @@ class TaskManager:
         task_gen = self.task_generator(items, chunk_size)
 
         if self.use_ray:
-            self._submit_ray(task_gen, at_once, kwargs_task)
+            self._submit_ray(task_gen, at_once, kwargs_task, kwargs_remote)
         else:
             self._submit(task_gen, at_once, kwargs_task)
 
@@ -154,6 +176,7 @@ class TaskManager:
         task_gen: Generator[Any, None, None],
         at_once: bool = False,
         kwargs_task: dict[str, Any] = dict(),
+        kwargs_remote: dict[str, Any] = dict(),
     ) -> None:
         """Handles task submission and result collection using Ray.
 
@@ -162,6 +185,9 @@ class TaskManager:
             at_once: If `True`, calls `process_items` to process all
                 items at once; otherwise, processes them individually.
             kwargs_task: Keyword arguments to pass into the task.
+            kwargs_remote: Keyword arguments to pass into `ray.remote` options.
+                `num_cpus` should not be included here, but set by changing
+                [`TaskManager.n_cores_worker`][manager.TaskManager.n_cores_worker].
         """
         if not ray.is_initialized():
             ray.init()
@@ -171,7 +197,7 @@ class TaskManager:
 
         results = []
         for chunk in task_gen:
-            if len(self.futures) >= self.n_cores:
+            if len(self.futures) >= self.max_concurrent_tasks:
                 # Wait for any worker to finish
                 done_futures, self.futures = ray.wait(self.futures, num_returns=1)
                 results_chunk = ray.get(done_futures[0])
@@ -183,7 +209,9 @@ class TaskManager:
                     results = results[self.save_interval :]
 
             # Submit new task to Ray
-            future = ray_worker.remote(self.task_class, chunk, **kwargs_task)
+            future = ray_worker.options(
+                num_cpus=self.n_cores_worker, **kwargs_remote
+            ).remote(self.task_class, chunk, **kwargs_task)
             self.futures.append(future)
 
         # Collect remaining Ray futures
