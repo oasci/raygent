@@ -1,4 +1,5 @@
 from typing import Any
+
 from abc import ABC
 
 from loguru import logger

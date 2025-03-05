@@ -1,7 +1,7 @@
-import pytest
-import numpy as np
 import os
-import shutil
+
+import numpy as np
+import pytest
 
 from raygent.savers import NumpySaver
 

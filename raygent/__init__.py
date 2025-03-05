@@ -1,9 +1,10 @@
 """Parallelism, Delegated"""
 
+from typing import Any
+
 import os
 import sys
 from ast import literal_eval
-from typing import Any
 
 from loguru import logger
 

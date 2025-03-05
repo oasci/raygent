@@ -1,5 +1,7 @@
 from typing import Any, Literal
+
 import numpy as np
+
 from raygent.savers import Saver
 
 try:

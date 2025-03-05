@@ -1,6 +1,7 @@
 import os
 
 import pytest
+
 from raygent import enable_logging
 
 TEST_DIR = os.path.dirname(__file__)
