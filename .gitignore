@@ -13,6 +13,7 @@ __pycache__
 public/
 
 .cache
+.mypy_cache
 
 node_modules
 package-lock.json
