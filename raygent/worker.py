@@ -6,7 +6,12 @@ import ray
 
 
 @ray.remote
-def ray_worker(task_class: Callable[[], Any], chunk: list[Any]) -> Any:
+def ray_worker(
+    task_class: Callable[[], Any],
+    chunk: list[Any],
+    *args: tuple[Any],
+    **kwargs: dict[str, Any],
+) -> Any:
     """
     Remote function to process a single item using the provided task class.
 
@@ -18,5 +23,5 @@ def ray_worker(task_class: Callable[[], Any], chunk: list[Any]) -> Any:
         Any: The result of the `run` method or an error tuple.
     """
     task_instance = task_class()
-    result = task_instance.run(chunk)
+    result = task_instance.run(chunk, *args, **kwargs)
     return result
