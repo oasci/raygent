@@ -52,7 +52,6 @@ class ZarrSaver(Saver):
         arr = np.array(data)
 
         store = zarr.storage.LocalStore(self.file_path, read_only=False)
-        print(store)
 
         if self.approach == "append":
             try:
