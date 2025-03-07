@@ -4,6 +4,7 @@ nav:
   - Manager: manager.md
   - examples
   - API: api
+  - Development: development.md
 
 sort:
   type: natural
