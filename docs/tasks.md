@@ -52,4 +52,4 @@ data = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
 print(task.run(data, at_once=True))  # Output: 5.0
 ```
 
-Using [task.Task.process_items] ensures optimized performance for numerical computations, making this approach well-suited for tasks involving large-scale data processing.
+Using [process_items][task.Task.process_items] ensures optimized performance for numerical computations, making this approach well-suited for tasks involving large-scale data processing.
