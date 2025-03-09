@@ -3,6 +3,7 @@ from typing import Any, Generator
 from collections.abc import Callable
 
 import ray
+from loguru import logger
 
 from raygent.results import BaseResultHandler, ListResultHandler
 from raygent.savers import Saver
@@ -258,7 +259,11 @@ class TaskManager:
             print(manager.max_concurrent_tasks)  # Output: 24
             ```
         """
-        return max(1, int(self.n_cores // self.n_cores_worker))
+        n_tasks = max(1, int(self.n_cores // self.n_cores_worker))
+        logger.debug(f"Total cores: {self.n_cores}")
+        logger.debug(f"Cores per worker: {self.n_cores_worker}")
+        logger.debug(f"Maximum number of concurrent tasks: {n_tasks}")
+        return n_tasks
 
     def task_generator(
         self, items: list[Any], chunk_size: int
@@ -397,6 +402,7 @@ class TaskManager:
             )
             ```
         """
+        logger.info(f"Submitting tasks with chunk_size of {chunk_size}")
         self.saver = saver
         self.save_interval = save_interval
 
@@ -447,6 +453,7 @@ class TaskManager:
             None. The processed results are stored in the instance attribute
                 `self.results`.
         """
+        logger.debug("Running tasks in serial")
         for chunk in task_gen:
             results_chunk = self.task_class().run(chunk, at_once=at_once, **kwargs_task)
             self.result_handler.add_chunk(results_chunk)
@@ -493,11 +500,15 @@ class TaskManager:
             None. The final, ordered results are stored in the instance attribute
                 `results`.
         """
+        logger.debug("Running tasks in parallel with Ray")
         if not ray.is_initialized():
+            logger.info("Initializing Ray.")
             ray.init()
 
         if self.n_cores < 0:
-            self.n_cores = int(ray.available_resources().get("CPU", 1))
+            n_cores = int(ray.available_resources().get("CPU", 1))
+            logger.info(f"Ray will be using {n_cores} cores")
+            self.n_cores = n_cores
 
         # Map each Ray future (its string representation) to its corresponding chunk index.
         indices_future: dict[str, int] = {}
@@ -519,6 +530,7 @@ class TaskManager:
                 )
 
             # Submit a new task to Ray.
+            logger.debug(f"Submitting Ray task which chunk_index of {chunk_index}")
             future = ray_worker.options(
                 num_cpus=self.n_cores_worker, **kwargs_remote
             ).remote(self.task_class, chunk, at_once, **kwargs_task)

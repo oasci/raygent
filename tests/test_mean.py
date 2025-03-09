@@ -1,9 +1,11 @@
 import numpy as np
 import pytest
+
 from raygent.results import OnlineMeanResultHandler
+from raygent.savers import Saver
 
 
-class DummySaver:
+class DummySaver(Saver):
     """A simple saver to record saved data."""
 
     def __init__(self):
@@ -43,7 +45,7 @@ def test_mean_multiple_chunks():
     assert results["n"] == 20
 
 
-def test_mean_periodic_save_and_finalize(DummySaver):
+def test_mean_periodic_save_and_finalize():
     handler = OnlineMeanResultHandler()
     saver = DummySaver()
     handler.add_chunk((np.array([3.0]), 3))

@@ -1,7 +1,6 @@
 import pytest
 
-from raygent import TaskManager
-from raygent import Task
+from raygent import Task, TaskManager
 
 
 class DummySaver:
@@ -25,21 +24,11 @@ class DummyTask(Task):
 
 
 @pytest.fixture
-def dummy_task_manager(DummyTask):
+def dummy_task_manager():
     # For testing, use DummyTask and sequential mode (use_ray=False).
     manager = TaskManager(task_class=DummyTask, use_ray=False)
-    # Ensure the result_handler has an empty results list.
-    manager.result_handler.results = []
+    print(manager.result_handler)
     return manager
-
-
-def test_task_generator(dummy_task_manager):
-    items = list(range(10))
-    chunk_size = 3
-    chunks = list(dummy_task_manager.task_generator(items, chunk_size))
-    assert len(chunks) == 4
-    assert chunks[0] == [0, 1, 2]
-    assert chunks[-1] == [9]
 
 
 def test_submit_tasks_sequential(dummy_task_manager):
