@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 import ray
 
+from raygent.results import BaseResultHandler, ListResultHandler
 from raygent.savers import Saver
 from raygent.worker import ray_worker
 
@@ -16,6 +17,7 @@ class TaskManager:
     def __init__(
         self,
         task_class: Callable[[], Any],
+        result_handler: BaseResultHandler | None = None,
         n_cores: int = -1,
         use_ray: bool = False,
         n_cores_worker: int = 1,
@@ -51,6 +53,11 @@ class TaskManager:
 
             manager = TaskManager(create_analyzer_task)
             ```
+        """
+
+        self.result_handler = result_handler or ListResultHandler()
+        """
+        TODO:
         """
 
         self.use_ray = use_ray
@@ -232,8 +239,8 @@ class TaskManager:
             and flooring the result.
             - Setting n_cores_worker appropriately is important for tasks with
             different computational profiles:
-            * CPU-bound tasks benefit from higher n_cores_worker values
-            * I/O-bound tasks typically work better with n_cores_worker=1 and
+            - CPU-bound tasks benefit from higher n_cores_worker values
+            - I/O-bound tasks typically work better with n_cores_worker=1 and
                 higher max_concurrent_tasks
 
         Examples:
@@ -259,15 +266,16 @@ class TaskManager:
         """
         Splits a list of items into smaller chunks and yields each chunk for processing.
 
-        This generator takes a list of items and partitions it into sublists (chunks) where each
-        chunk contains up to `chunk_size` items. This is useful for processing large datasets
-        in smaller, manageable batches, whether processing sequentially or in parallel using Ray.
+        This generator takes a list of items and partitions it into sublists (chunks)
+        where each chunk contains up to `chunk_size` items. This is useful for
+        processing large datasets in smaller, manageable batches, whether processing
+        sequentially or in parallel using Ray.
 
         Args:
             items: The complete list of items to be processed.
             chunk_size: The number of items to include in each chunk. If the total number
-                of items is not evenly divisible by `chunk_size`, the final chunk will contain
-                the remaining items.
+                of items is not evenly divisible by `chunk_size`, the final chunk will
+                contain the remaining items.
 
         Yields:
             Each yielded value is a sublist of `items` containing up to
@@ -399,6 +407,8 @@ class TaskManager:
         else:
             self._submit(task_gen, at_once, kwargs_task)
 
+        self.result_handler.finalize(self.saver)
+
     def _submit(
         self,
         task_gen: Generator[Any, None, None],
@@ -437,19 +447,10 @@ class TaskManager:
             None. The processed results are stored in the instance attribute
                 `self.results`.
         """
-        results = []
         for chunk in task_gen:
             results_chunk = self.task_class().run(chunk, at_once=at_once, **kwargs_task)
-            results.extend(results_chunk)
-
-            if self.saver and len(results) >= self.save_interval:
-                self.saver.save(results[: self.save_interval], **self.save_kwargs)
-                self.results.extend(results[: self.save_interval])
-                results = results[self.save_interval :]
-
-        if self.saver and len(results) > 0:
-            self.saver.save(results, **self.save_kwargs)
-        self.results.extend(results)
+            self.result_handler.add_chunk(results_chunk)
+            self.result_handler.periodic_save_if_needed(self.saver, self.save_interval)
 
     def _submit_ray(
         self,
@@ -498,40 +499,26 @@ class TaskManager:
         if self.n_cores < 0:
             self.n_cores = int(ray.available_resources().get("CPU", 1))
 
-        # Dictionary to hold results per chunk (key: chunk index, value: list of results)
-        results_chunks: dict[int, list[Any]] = {}
-        # Pointer to the next chunk index that should be flushed into the final results list
-        next_chunk_index = 0
-        # For mapping ObjectRef to its chunk index
+        # Map each Ray future (its string representation) to its corresponding chunk index.
         indices_future: dict[str, int] = {}
         chunk_index = 0
-        final_results: list[Any] = []  # Temporary buffer for unsaved results
 
-        # Submit tasks
+        # Submit tasks and process completed ones as we go.
         for chunk in task_gen:
-            # If we're at max concurrency, wait for one to finish
+            # If the maximum concurrency is reached, wait for one task to finish.
             if len(self.futures) >= self.max_concurrent_tasks:
                 done_futures, self.futures = ray.wait(self.futures, num_returns=1)
-                # Get the chunk index for this finished task
-                finished_index = indices_future.pop(str(done_futures[0]))
-                results_chunk = ray.get(done_futures[0])
-                # Save the result chunk in the dictionary
-                results_chunks[finished_index] = results_chunk
+                finished_future = done_futures[0]
+                finished_index = indices_future.pop(str(finished_future))
+                results_chunk = ray.get(finished_future)
+                self.result_handler.add_chunk(
+                    chunk_results=results_chunk, chunk_index=finished_index
+                )
+                self.result_handler.periodic_save_if_needed(
+                    self.saver, self.save_interval
+                )
 
-                # Flush any contiguous finished chunks to final_results
-                while next_chunk_index in results_chunks:
-                    final_results.extend(results_chunks.pop(next_chunk_index))
-                    next_chunk_index += 1
-
-                    # Optionally, save periodically if a saver is provided
-                    if self.saver and len(final_results) >= self.save_interval:
-                        self.saver.save(
-                            final_results[: self.save_interval], **self.save_kwargs
-                        )
-                        self.results.extend(final_results[: self.save_interval])
-                        final_results = final_results[self.save_interval :]
-
-            # Submit a new task to Ray
+            # Submit a new task to Ray.
             future = ray_worker.options(
                 num_cpus=self.n_cores_worker, **kwargs_remote
             ).remote(self.task_class, chunk, at_once, **kwargs_task)
@@ -539,30 +526,18 @@ class TaskManager:
             indices_future[str(future)] = chunk_index
             chunk_index += 1
 
-        # Collect remaining futures
+        # Process any remaining futures.
         while self.futures:
             done_futures, self.futures = ray.wait(self.futures, num_returns=1)
-            finished_index = indices_future.pop(str(done_futures[0]))
-            results_chunk = ray.get(done_futures[0])
-            results_chunks[finished_index] = results_chunk
+            finished_future = done_futures[0]
+            finished_index = indices_future.pop(str(finished_future))
+            results_chunk = ray.get(finished_future)
+            self.result_handler.add_chunk(
+                chunk_results=results_chunk, chunk_index=finished_index
+            )
+            self.result_handler.periodic_save_if_needed(self.saver, self.save_interval)
 
-            # Flush contiguous finished chunks
-            while next_chunk_index in results_chunks:
-                final_results.extend(results_chunks.pop(next_chunk_index))
-                next_chunk_index += 1
-                if self.saver and len(final_results) >= self.save_interval:
-                    self.saver.save(
-                        final_results[: self.save_interval], **self.save_kwargs
-                    )
-                    self.results.extend(final_results[: self.save_interval])
-                    final_results = final_results[self.save_interval :]
-
-        # Save any remaining results
-        if self.saver and final_results:
-            self.saver.save(final_results, **self.save_kwargs)
-        self.results.extend(final_results)
-
-    def get_results(self) -> list[Any]:
+    def get_results(self) -> list[Any] | dict[str, Any]:
         """Retrieves all collected results from completed tasks.
 
         This method provides access to the accumulated results that have been
@@ -598,4 +573,4 @@ class TaskManager:
             sum_of_squares = sum(results)  # 55
             ```
         """
-        return self.results
+        return self.result_handler.get_results()

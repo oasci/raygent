@@ -57,7 +57,10 @@ class Saver(ABC):
 
     @abstractmethod
     def save(
-        self, data: list[Any], indices: Any | None = None, **kwargs: dict[str, Any]
+        self,
+        data: list[Any] | dict[str, Any],
+        indices: Any | None = None,
+        **kwargs: dict[str, Any],
     ) -> None:
         """Saves the provided data to the configured destination.
 
