@@ -8,31 +8,50 @@ from raygent.savers import Saver
 
 
 class OnlineMeanResultHandler(BaseResultHandler):
-    """
-    Computes an online, element-wise mean for NumPy arrays using a numerically stable,
-    parallel algorithm designed to avoid overflow and minimize numerical error.
+    r"""
+    `OnlineMeanResultHandler` provides a numerically stable, online (incremental)
+    algorithm to compute the arithmetic mean of large, streaming, or distributed
+    datasets represented as NumPy arrays. In many real-world applications—such a
+    distributed computing or real-time data processing—data is processed
+    in chunks, with each chunk yielding a partial mean and its corresponding count.
+    This class merges these partial results into a global mean without needing to
+    store all the raw data, thus avoiding issues such as numerical overflow and
+    precision loss.
 
-    In distributed or streaming data settings, each task computes a partial mean over
-    a subset of data and returns a tuple: (partial_mean, count). Rather than directly summing
-    all values—which can lead to numerical overflow or loss of precision—the handler combines
-    these partial results into a global mean.
+    Suppose the overall dataset is divided into k chunks.
+    For each chunk $i$ (where $1 \leq i \leq k$), let:
 
-    The merging uses a weighted update formula based on the counts of the observations:
+      - $m_i$ be the partial mean computed over $n_i$ data points.
+      - $M_i$ be the global mean computed after processing $i$ chunks.
+      - $N_i = n_1 + n_2 + ... + n_i$ be the cumulative count after $i$ chunks.
 
-        M_{new} = M_{old} + (m_{partial} - M_{old}) * (n_{partial} / (n_{old} + n_{partial}))
+    The arithmetic mean of all data points is defined as:
 
-    where:
-      - \( M_{old} \) is the current global mean,
-      - \( m_{partial} \) is the mean computed for the new data chunk,
-      - \( n_{old} \) is the number of observations included in the current global mean,
-      - \( n_{partial} \) is the number of observations in the new chunk.
+    $$
+    M_\text{total} = \frac{n_1 m_1 + n_2 m_2 + \ldots + n_k m_k}{n_1 + n_2 + \ldots + n_k}
+    $$
 
-    This formula is derived from the weighted average:
+    Rather than computing $M_{total}$ from scratch after processing all data,
+    the class uses an iterative update rule. When merging a new partial result
+    `(m_partial, n_partial)` with the current global mean `M_old` (with count
+    `n_old`), the updated mean is given by:
 
-        M_{new} = \frac{n_{old} \cdot M_{old} + n_{partial} \cdot m_{partial}}{n_{old} + n_{partial}},
+    $$
+    M_\text{new} = M_\text{old} + \left( m_\text{partial} - M_\text{old} \right) \cdot
+        \frac{n_\text{partial}}{n_\text{old} + n_\text{partial}}
+    $$
 
-    which can be rearranged to the above update form. This rearrangement is more stable when
-    processing large data values or when combining many chunks sequentially.
+    This update is mathematically equivalent to the weighted average:
+
+    $$
+    M_\text{new} = \frac{n_\text{old} M_\text{old} + n_\text{partial} m_\text{partial}}{n_\text{old} + n_\text{partial}}
+    $$
+
+    but is rearranged to enhance numerical stability. By focusing on the
+    difference `(m_partial - M_old)` and scaling it by the relative weight
+    `n_partial / (n_old + n_partial)`, the algorithm minimizes the round-off
+    errors that can occur when summing large numbers or when processing many
+    chunks sequentially.
     """
 
     def __init__(self) -> None:
@@ -54,7 +73,10 @@ class OnlineMeanResultHandler(BaseResultHandler):
 
     def add_chunk(
         self,
-        chunk_results: list[tuple[npt.NDArray[np.float64], int]] | tuple[npt.NDArray[np.float64], int],
+        chunk_results: (
+            list[tuple[npt.NDArray[np.float64], int]]
+            | tuple[npt.NDArray[np.float64], int]
+        ),
         chunk_index: int | None = None,
         *args: tuple[Any],
         **kwargs: dict[str, Any],
@@ -62,63 +84,52 @@ class OnlineMeanResultHandler(BaseResultHandler):
         """
         Processes one or more chunks of partial results to update the global mean.
 
-        Each partial result must be a tuple consisting of:
-            - A NumPy array representing the partial mean of a data chunk.
-            - An integer representing the count of observations in that chunk.
-
-        The update rule for merging a new partial result \((m_{partial}, n_{partial})\) with the
-        current global result \((M_{old}, n_{old})\) is as follows:
-
-            \( M_{new} = M_{old} + \left(m_{partial} - M_{old}\right) \times \frac{n_{partial}}{n_{old} + n_{partial}} \)
-            \( n_{new} = n_{old} + n_{partial} \)
-
-        This formula is mathematically equivalent to computing the weighted average:
-
-            \( M_{new} = \frac{n_{old} \times M_{old} + n_{partial} \times m_{partial}}{n_{old} + n_{partial}} \)
-
-        but it provides better numerical stability when combining a large number of values.
-
         Args:
-            chunk_results: Either a single tuple (partial_mean, count) or a list of such tuples.
+            chunk_results: Either a single tuple (partial_mean, count) or a list of
+                such tuples. Each partial result must be a tuple consisting of:
+                    - A NumPy array representing the partial mean of a data chunk.
+                    - An integer representing the count of observations in that chunk.
             chunk_index: An optional index identifier for the chunk (for interface consistency, not used in calculations).
         """
-        # If a single tuple is provided, wrap it in a list.
         if isinstance(chunk_results, tuple):
             chunk_results = [chunk_results]
 
         for partial_mean, count in chunk_results:
             if self.global_mean is None:
-                # Initialize global_mean with the first partial mean.
                 self.global_mean = np.array(partial_mean, dtype=np.float64)
                 self.total_count = count
             else:
-                # Merge the new partial mean with the current global mean.
                 new_total = self.total_count + count
-                # Compute the weighted difference and update the global mean.
-                self.global_mean = self.global_mean + (partial_mean - self.global_mean) * (count / new_total)
+                self.global_mean = self.global_mean + (
+                    partial_mean - self.global_mean
+                ) * (count / new_total)
                 self.total_count = new_total
 
     def periodic_save_if_needed(self, saver: Saver | None, save_interval: int) -> None:
         """
         Persists the current global mean at periodic intervals if a saver is provided.
 
-        This method is useful in long-running or distributed applications where saving intermediate
-        results is necessary for fault tolerance. It checks if the total number of observations processed
-        meets or exceeds the `save_interval` and, if so, invokes the save method of the provided saver.
+        This method is useful in long-running or distributed applications where saving
+        intermediate results is necessary for fault tolerance. It checks if the total
+        number of observations processed meets or exceeds the `save_interval` and,
+        if so, invokes the save method of the provided saver.
 
         Args:
-            saver: An instance of a Saver, which has a save method to persist data, or None.
-            save_interval: The threshold for the total number of observations to trigger a save.
+            saver: An instance of a Saver, which has a save method to persist data,
+                or None.
+            save_interval: The threshold for the total number of observations to
+                trigger a save.
         """
         if saver and self.total_count >= save_interval and self.global_mean is not None:
             saver.save({"mean": self.global_mean, "n": self.total_count})
 
     def finalize(self, saver: Saver | None) -> None:
         """
-        Finalizes the accumulation process and persists the final global mean if a saver is provided.
+        Finalizes the accumulation process and persists the final global mean
+        if a saver is provided.
 
-        This method should be called when no more data is expected. It ensures that the final
-        computed mean and the total observation count are saved.
+        This method should be called when no more data is expected. It ensures
+        that the final computed mean and the total observation count are saved.
 
         Args:
             saver: An instance of a Saver to save the final result, or None.
@@ -128,15 +139,19 @@ class OnlineMeanResultHandler(BaseResultHandler):
 
     def get_results(self) -> dict[str, npt.NDArray[np.float64] | int]:
         """
-        Retrieves the final computed global mean along with the total number of observations.
+        Retrieves the final computed global mean along with the total number of
+        observations.
 
         Returns:
             A dictionary with the following keys:
-                - "mean": A NumPy array representing the computed global mean.
-                - "n": An integer representing the total number of observations processed.
+
+                -   `"mean"`: A NumPy array representing the computed global mean.
+                -   `"n"`: An integer representing the total number of observations
+                    processed.
 
         Raises:
-            ValueError: If no data has been processed (i.e., `global_mean` is None or `total_count` is zero).
+            ValueError: If no data has been processed (i.e., `global_mean` is None or
+                `total_count` is zero).
         """
         if self.global_mean is None or self.total_count == 0:
             raise ValueError("No data has been processed.")
