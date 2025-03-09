@@ -65,6 +65,7 @@ plugins:
         python:
           inventories:
             - "https://docs.python.org/3/objects.inv"
+            - "https://numpy.org/doc/stable/objects.inv"
           paths: ["raygent"]
           options:
             show_source: false
