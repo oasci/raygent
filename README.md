@@ -59,7 +59,9 @@ print(results)  # [1, 4, 9, 16, 25]
 
 ## Installation
 
-Clone the [repository](https://github.com/oasci/raygent):
+
+You can install `raygent` directly from the [GitHub repository](https://github.com/oasci/raygent).
+First, clone the [repository](https://github.com/oasci/raygent)
 
 ```bash
 git clone git@github.com:oasci/raygent.git
@@ -72,6 +74,12 @@ pip install .
 ```
 
 This will install all dependencies and `raygent` into your current Python environment.
+
+To enable `raygent`'s full parallelization capabilities using Ray, install it with the `ray` extra.
+
+```python
+pip install .[ray]
+```
 
 ## Development
 

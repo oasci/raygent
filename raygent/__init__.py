@@ -10,21 +10,23 @@ from loguru import logger
 
 from raygent.manager import TaskManager
 from raygent.task import Task
-from raygent.worker import ray_worker
 
-__all__ = ["TaskManager", "Task", "ray_worker"]
+__all__ = ["TaskManager", "Task"]
 
 logger.disable("raygent")
 
 LOG_FORMAT = (
     "<green>{time:HH:mm:ss}</green> | "
     "<level>{level: <8}</level> | "
-    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+    "<level>{message}</level>"
 )
 
 
 def enable_logging(
-    level_set: int, stdout_set: bool = True, file_path: str | None = None
+    level_set: int,
+    stdout_set: bool = True,
+    file_path: str | None = None,
+    log_format: str = LOG_FORMAT,
 ) -> None:
     r"""Enable logging.
 
@@ -35,11 +37,21 @@ def enable_logging(
     config: dict[str, Any] = {"handlers": []}
     if stdout_set:
         config["handlers"].append(
-            {"sink": sys.stdout, "level": level_set, "format": LOG_FORMAT}
+            {
+                "sink": sys.stdout,
+                "level": level_set,
+                "format": log_format,
+                "colorize": True,
+            }
         )
     if isinstance(file_path, str):
         config["handlers"].append(
-            {"sink": file_path, "level": level_set, "format": LOG_FORMAT}
+            {
+                "sink": file_path,
+                "level": level_set,
+                "format": log_format,
+                "colorize": True,
+            }
         )
     # https://loguru.readthedocs.io/en/stable/api/logger.html#loguru._logger.Logger.configure
     logger.configure(**config)

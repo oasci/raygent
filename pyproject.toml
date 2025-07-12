@@ -4,15 +4,40 @@ description = "Parallelism, Delegated"
 authors = [
     {name = "oasci", email = "us@oasci.org"}
 ]
+maintainers = [
+    {name = "Alex M. Maldonado", email = "alex.maldonado@pitt.edu"}
+]
 dynamic = ["version"]
 readme = "README.md"
 requires-python = ">=3.10"
+license = "Apache-2.0"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
 
-# TODO: Keep this here until pixi releases building capabilities
 dependencies = [
     "loguru>=0.7.2,<1.0",
+]
+
+[project.optional-dependencies]
+ray = [
     "ray>=2.10.0,<3",
 ]
+
+[project.urls]
+Documentation = "https://raygent.oasci.org"
+Repository = "https://github.com/oasci/raygent"
+Issues = "https://github.com/oasci/raygent/issues"
+Changelog = "https://github.com/oasci/raygent/blob/main/CHANGELOG.md"
+
 
 [build-system]
 requires = ["setuptools>=61.0", "setuptools-scm>=8", "wheel"]

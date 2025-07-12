@@ -2,12 +2,18 @@ from typing import Any, Generator
 
 from collections.abc import Callable
 
-import ray
+try:
+    import ray
+
+    from raygent.worker import ray_worker
+
+    HAS_RAY = True
+except ImportError:
+    HAS_RAY = False
 from loguru import logger
 
 from raygent.results import BaseResultHandler, ListResultHandler
 from raygent.savers import Saver
-from raygent.worker import ray_worker
 
 
 class TaskManager:
@@ -81,6 +87,9 @@ class TaskManager:
             manager = TaskManager(MyTask, use_ray=True, n_cores=8)
             ```
         """
+
+        if use_ray is True and not HAS_RAY:
+            raise ImportError("Requested to use ray, but ray is not installed.")
 
         self.n_cores = n_cores
         """
@@ -255,7 +264,9 @@ class TaskManager:
             print(manager.max_concurrent_tasks)  # Output: 4
 
             # With 24 total cores and 1 core per worker (for I/O-bound tasks)
-            manager = TaskManager(IOBoundTask, n_cores=24, n_cores_worker=1, use_ray=True)
+            manager = TaskManager(
+                IOBoundTask, n_cores=24, n_cores_worker=1, use_ray=True
+            )
             print(manager.max_concurrent_tasks)  # Output: 24
             ```
         """
@@ -380,7 +391,7 @@ class TaskManager:
             manager.submit_tasks(
                 text_documents,
                 chunk_size=50,
-                kwargs_task={"min_length": 10, "language": "en"}
+                kwargs_task={"min_length": 10, "language": "en"},
             )
             results = manager.get_results()
             ```
@@ -398,7 +409,7 @@ class TaskManager:
                 chunk_size=200,
                 saver=saver,
                 save_interval=1000,
-                kwargs_remote={"max_retries": 3}
+                kwargs_remote={"max_retries": 3},
             )
             ```
         """

@@ -21,6 +21,7 @@ docs = ["docs"]
 
 [dependencies]
 python = ">=3.10"
+loguru = ">=0.7.2,<1"
 
 [feature.dev.dependencies]
 isort = ">=5.12.0"
@@ -42,9 +43,9 @@ twine = ">=6.1.0,<7"
 
 
 [feature.dev.tasks]
-mdlint = { cmd = ["markdownlint-cli2", '"**/*.{md,markdown}"', "--fix", "--config", ".markdownlint.yaml", "||", "true"] }
+mdlint = { cmd = ["markdownlint-cli2", '"docs/*.{md,markdown}"', "--fix", "--config", ".markdownlint.yaml", "||", "true"] }
 isort = { cmd = ["isort", "--settings-path", ".isort.cfg", "./raygent", "./tests", "||", "true"] }
-ruff = { cmd = ["ruff", "--config", ".ruff.toml", "./raygent", "./tests", "||", "true"] }
+ruff = { cmd = ["ruff", "format", "--config", ".ruff.toml", "./raygent", "./tests", "||", "true"] }
 format = { depends-on = ["mdlint", "isort", "ruff"] }
 tests = { cmd = [
     "PYTHONPATH=.",
