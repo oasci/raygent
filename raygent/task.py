@@ -43,12 +43,15 @@ class Task(ABC):
 
             def process_item(self, item, **kwargs):
                 # Process each text individually with options from kwargs
-                min_word_length = kwargs.get('min_word_length', 3)
+                min_word_length = kwargs.get("min_word_length", 3)
                 return {
-                    'text': item,
-                    'word_count': len([w for w in item.split() if len(w) >= min_word_length]),
-                    'sentiment': self.nlp.analyze_sentiment(item)
+                    "text": item,
+                    "word_count": len(
+                        [w for w in item.split() if len(w) >= min_word_length]
+                    ),
+                    "sentiment": self.nlp.analyze_sentiment(item),
                 }
+
 
         # Usage
         analyzer = TextAnalyzerTask()
@@ -71,6 +74,7 @@ class Task(ABC):
             def process_items(self, items, **kwargs):
                 # For batch processing when efficiency is critical
                 import numpy as np
+
                 # Convert to numpy array for vectorized operations
                 data = np.array(items)
                 processed = self._batch_transform(data, **kwargs)
@@ -90,10 +94,12 @@ class Task(ABC):
         ```python
         from raygent.manager import TaskManager
 
+
         # Create a custom task
         class MyTask(Task):
             def process_item(self, item, **kwargs):
                 return item * 2
+
 
         # Process items using TaskManager (handles parallelization)
         manager = TaskManager(MyTask, use_ray=True, n_cores=4)
@@ -174,7 +180,8 @@ class Task(ABC):
             ```python
             class NumberSquarerTask(Task):
                 def process_item(self, item, **kwargs):
-                    return item ** 2
+                    return item**2
+
 
             task = NumberSquarerTask()
             results = task.run([1, 2, 3, 4, 5])
@@ -187,11 +194,13 @@ class Task(ABC):
             class VectorMultiplierTask(Task):
                 def process_items(self, items, **kwargs):
                     import numpy as np
+
                     # Convert to numpy array for efficient vector operations
                     arr = np.array(items)
                     # Apply scaling factor from kwargs if provided
-                    scale = kwargs.get('scale', 1.0)
+                    scale = kwargs.get("scale", 1.0)
                     return (arr * scale).tolist()
+
 
             task = VectorMultiplierTask()
             results = task.run([1, 2, 3, 4, 5], at_once=True, scale=2.0)
@@ -203,8 +212,9 @@ class Task(ABC):
             ```python
             class DivisionTask(Task):
                 def process_item(self, item, **kwargs):
-                    divisor = kwargs.get('divisor', 2)
+                    divisor = kwargs.get("divisor", 2)
                     return item / divisor
+
 
             task = DivisionTask()
             results = task.run([4, 6, 0, 8], divisor=0)
@@ -271,7 +281,7 @@ class Task(ABC):
                     return {
                         "text": item,
                         "category": self.model.predict(item),
-                        "confidence": self.model.confidence(item)
+                        "confidence": self.model.confidence(item),
                     }
             ```
         """

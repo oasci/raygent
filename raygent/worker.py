@@ -63,10 +63,7 @@ def ray_worker(
 
         # Create a remote worker with 2 CPUs
         future = ray_worker.options(num_cpus=2).remote(
-            MyTask,
-            items_chunk,
-            at_once=False,
-            custom_param="value"
+            MyTask, items_chunk, at_once=False, custom_param="value"
         )
 
         # Get results
@@ -78,16 +75,13 @@ def ray_worker(
         ```python
         # Configure worker with custom resources and retries
         future = ray_worker.options(
-            num_cpus=4,
-            num_gpus=1,
-            max_retries=3,
-            resources={"custom_resource": 1}
+            num_cpus=4, num_gpus=1, max_retries=3, resources={"custom_resource": 1}
         ).remote(
             ComplexTask,
             large_chunk,
             at_once=True,
             preprocessing_steps=["normalize", "filter"],
-            batch_size=64
+            batch_size=64,
         )
         ```
 

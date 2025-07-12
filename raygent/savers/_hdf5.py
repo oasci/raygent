@@ -58,9 +58,7 @@ class HDF5Saver(Saver):
         ```python
         # Create a saver that overwrites existing data
         saver = HDF5Saver(
-            "daily_metrics.h5",
-            dataset_name="day_20240306",
-            approach="overwrite"
+            "daily_metrics.h5", dataset_name="day_20240306", approach="overwrite"
         )
 
         # Save new results, replacing any existing dataset
@@ -73,9 +71,7 @@ class HDF5Saver(Saver):
         ```python
         # Create a saver for updating existing data
         saver = HDF5Saver(
-            "time_series.h5",
-            dataset_name="sensor_readings",
-            approach="update"
+            "time_series.h5", dataset_name="sensor_readings", approach="update"
         )
 
         # Update specific time indices with new values
@@ -188,14 +184,16 @@ class HDF5Saver(Saver):
                 dtype="float32",
                 compression="gzip",
                 compression_opts=9,
-                chunks=(100,)
+                chunks=(100,),
             )
             ```
 
             Updating specific indices:
 
             ```python
-            saver = HDF5Saver("values.h5", dataset_name="sensor_data", approach="update")
+            saver = HDF5Saver(
+                "values.h5", dataset_name="sensor_data", approach="update"
+            )
 
             # Update specific positions in an existing dataset
             new_values = [99.5, 98.3, 97.8]

@@ -58,9 +58,7 @@ class ZarrSaver(Saver):
         ```python
         # Create a saver that overwrites existing data
         saver = ZarrSaver(
-            "results.zarr",
-            dataset_name="daily_metrics",
-            approach="overwrite"
+            "results.zarr", dataset_name="daily_metrics", approach="overwrite"
         )
 
         # Save a batch of results directly
@@ -72,11 +70,7 @@ class ZarrSaver(Saver):
 
         ```python
         # Create a saver for updating existing data
-        saver = ZarrSaver(
-            "results.zarr",
-            dataset_name="time_series",
-            approach="update"
-        )
+        saver = ZarrSaver("results.zarr", dataset_name="time_series", approach="update")
 
         # Update specific time indices with new values
         new_data = calculate_corrections(raw_data)
@@ -89,15 +83,12 @@ class ZarrSaver(Saver):
         ```python
         # Using with AWS S3 (requires s3fs)
         import s3fs
+
         s3 = s3fs.S3FileSystem(anon=False)
         store = s3fs.S3Map(root="mybucket/zarr-data", s3=s3, check=False)
 
         # Create a ZarrSaver with the S3 location
-        saver = ZarrSaver(
-            store,
-            dataset_name="remote_dataset",
-            approach="append"
-        )
+        saver = ZarrSaver(store, dataset_name="remote_dataset", approach="append")
         ```
 
     Notes:
@@ -191,12 +182,8 @@ class ZarrSaver(Saver):
             saver = ZarrSaver("compressed_results.zarr")
 
             # Save with customized storage parameters
-            compressor = numcodecs.Blosc(cname='zstd', clevel=9)
-            saver.save(
-                large_dataset,
-                chunks=(1000,),
-                compressor=compressor
-            )
+            compressor = numcodecs.Blosc(cname="zstd", clevel=9)
+            saver.save(large_dataset, chunks=(1000,), compressor=compressor)
             ```
 
             Updating specific indices:

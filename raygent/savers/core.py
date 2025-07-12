@@ -38,10 +38,11 @@ class Saver(ABC):
                 self.file_exists = os.path.exists(file_path)
 
             def save(self, data, indices=None, **kwargs):
-                mode = 'a' if self.file_exists else 'w'
+                mode = "a" if self.file_exists else "w"
                 header = not self.file_exists
 
                 import pandas as pd
+
                 df = pd.DataFrame(data)
                 df.to_csv(self.file_path, mode=mode, header=header, index=False)
                 self.file_exists = True
