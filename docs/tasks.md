@@ -22,9 +22,9 @@ This allows tasks to be easily customized for different computational requiremen
 from raygent import Task
 
 
-class SquareTask(Task[float, float]):
-    def process_item(self, item: float) -> float:
-        return item ** 2
+class SquareTask(Task[list[float], list[float]]):
+    def process_items(self, items: list[float]) -> list[float]:
+        return [i ** 2 for i in items]
 
 task = SquareTask()
 print(task.run([1., 2., 3., 4.]))  # Output: [1, 4, 9, 16]

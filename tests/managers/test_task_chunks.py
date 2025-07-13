@@ -15,11 +15,8 @@ class DummySaver:
         self.saved_data.append(data)
 
 
-class DummyTask(Task[float, float]):
+class DummyTask(Task[list[float], list[float]]):
     """A dummy task that doubles the input."""
-
-    def process_item(self, item: float, **kwargs: dict[str, Any]) -> float:
-        return item * 2
 
     def process_items(
         self, items: list[float], **kwargs: dict[str, Any]

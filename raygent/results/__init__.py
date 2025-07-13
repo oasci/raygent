@@ -1,9 +1,11 @@
-from .base import BaseResultHandler
-from .list_handler import ListResultHandler
+from .result import Result
+from .accumulator import ResultAccumulator
+from ._list import ListResults
 from .mean import OnlineMeanResultHandler
 
 __all__ = [
-    "BaseResultHandler",
-    "ListResultHandler",
+    "Result",
+    "ResultAccumulator",
+    "ListResults",
     "OnlineMeanResultHandler",
 ]

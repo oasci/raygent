@@ -12,7 +12,7 @@ except ImportError:
     has_ray = False
 from loguru import logger
 
-from raygent.results import BaseResultHandler, ListResultHandler
+from raygent.results import ResultAccumulator, ListResults
 from raygent.savers import Saver
 
 if TYPE_CHECKING:
@@ -30,7 +30,7 @@ class TaskManager(Generic[InputType, OutputType]):
     def __init__(
         self,
         task_class: "Task[InputType, OutputType]",
-        result_handler: BaseResultHandler | None = None,
+        result_handler: ResultAccumulator | None = None,
         n_cores: int = -1,
         use_ray: bool = False,
         n_cores_worker: int = 1,
@@ -69,7 +69,7 @@ class TaskManager(Generic[InputType, OutputType]):
             ```
         """
 
-        self.result_handler = result_handler or ListResultHandler()
+        self.result_handler = result_handler or ListResults()
         """
         TODO:
         """
