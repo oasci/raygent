@@ -1,13 +1,17 @@
-from typing import Any
-
-from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import ray
+
+if TYPE_CHECKING:
+    from raygent import Task
+
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
 
 
 @ray.remote
 def ray_worker(
-    task_class: Callable[[], Any],
+    task_class: "Task[InputType, OutputType]",
     chunk: list[Any],
     at_once: bool,
     *args: tuple[Any],

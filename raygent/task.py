@@ -130,7 +130,7 @@ class Task(ABC, Generic[InputType, OutputType]):
         Useful for setting up connections or loading shared resources.
         """
 
-    def teardown(self) -> None:
+    def teardown(self, **kwargs: dict[str, Any]) -> None:
         """
         Optional teardown method called once after all processing is complete.
         Useful for closing connections or releasing resources.
@@ -253,7 +253,7 @@ class Task(ABC, Generic[InputType, OutputType]):
         self.teardown(**kwargs)
         return results
 
-    def process_item(self, item: InputType, **kwargs: dict[str, Any]) -> Any:
+    def process_item(self, item: InputType, **kwargs: dict[str, Any]) -> OutputType:
         """Processes a single item independently.
 
         This method defines the computation logic for processing an individual item.
@@ -302,11 +302,13 @@ class Task(ABC, Generic[InputType, OutputType]):
                     }
             ```
         """
-        raise NotImplementedError
+        raise NotImplementedError(
+            "process_item was requested with at_once=False, but not implemented"
+        )
 
     def process_items(
-        self, items: list[InputType], **kwargs: dict[str, Any]
-    ) -> list[Any]:
+        self, items: Collection[InputType], **kwargs: dict[str, Any]
+    ) -> list[OutputType]:
         """Processes multiple items at once in a batch operation.
 
         This method defines the computation logic for batch processing a collection
@@ -363,4 +365,6 @@ class Task(ABC, Generic[InputType, OutputType]):
                     ]
             ```
         """
-        raise NotImplementedError
+        raise NotImplementedError(
+            "process_items was requested with at_once=True, but not implemented"
+        )

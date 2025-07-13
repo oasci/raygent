@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from collections.abc import Generator
+from collections.abc import Generator, Iterable
 
 try:
     import ray
@@ -293,8 +293,8 @@ class TaskManager(Generic[InputType, OutputType]):
         return n_tasks
 
     def task_generator(
-        self, items: list[Any], chunk_size: int
-    ) -> Generator[Any, None, None]:
+        self, items: Iterable[InputType], chunk_size: int
+    ) -> Generator[list[InputType], None, None]:
         """
         Splits a list of items into smaller chunks and yields each chunk for processing.
 
@@ -320,13 +320,18 @@ class TaskManager(Generic[InputType, OutputType]):
             [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]]
             ```
         """
-        for start in range(0, len(items), chunk_size):
-            end = min(start + chunk_size, len(items))
-            yield items[start:end]
+        current_chunk: list[InputType] = []
+        for item in items:
+            current_chunk.append(item)
+            if len(current_chunk) >= chunk_size:
+                yield current_chunk
+                current_chunk = []
+        if current_chunk:
+            yield current_chunk
 
     def submit_tasks(
         self,
-        items: list[Any],
+        items: Iterable[InputType],
         chunk_size: int = 100,
         saver: Saver | None = None,
         at_once: bool = False,
