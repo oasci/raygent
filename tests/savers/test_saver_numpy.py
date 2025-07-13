@@ -5,13 +5,6 @@ import pytest
 
 from raygent.savers import NumpySaver
 
-try:
-    import zarr
-
-    HAS_ZARR = True
-except ImportError:
-    HAS_ZARR = False
-
 
 @pytest.fixture
 def test_data() -> list[int]:

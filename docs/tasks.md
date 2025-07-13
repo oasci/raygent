@@ -22,12 +22,12 @@ This allows tasks to be easily customized for different computational requiremen
 from raygent import Task
 
 
-class SquareTask(Task):
+class SquareTask(Task[float, float]):
     def process_item(self, item: float) -> float:
         return item ** 2
 
 task = SquareTask()
-print(task.run([1, 2, 3, 4]))  # Output: [1, 4, 9, 16]
+print(task.run([1., 2., 3., 4.]))  # Output: [1, 4, 9, 16]
 ```
 
 ## `process_items`
@@ -43,7 +43,7 @@ import numpy.typing as npt
 from raygent import Task
 
 
-class MeanTask(Task):
+class MeanTask(Task[npt.NDArray[np.float64], np.float64]):
     def process_items(self, items: npt.NDArray[np.float64]) -> np.float64:
         return np.mean(items)
 

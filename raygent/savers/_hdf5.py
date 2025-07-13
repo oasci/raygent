@@ -7,9 +7,9 @@ from raygent.savers import Saver
 try:
     import h5py
 
-    HAS_H5PY = True
+    has_h5py = True
 except ImportError:
-    HAS_H5PY = False
+    has_h5py = False
 
 
 class HDF5Saver(Saver):
@@ -211,7 +211,7 @@ class HDF5Saver(Saver):
             - For optimal performance with large datasets, configure appropriate
               chunk sizes based on expected access patterns.
         """
-        if not HAS_H5PY:
+        if not has_h5py:
             raise ImportError("H5PY is not installed.")
 
         arr = np.array(data, dtype=kwargs.get("dtype"))

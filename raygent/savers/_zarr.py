@@ -7,9 +7,9 @@ from raygent.savers import Saver
 try:
     import zarr
 
-    HAS_ZARR = True
+    has_zarr = True
 except ImportError:
-    HAS_ZARR = False
+    has_zarr = False
 
 
 class ZarrSaver(Saver):
@@ -206,7 +206,7 @@ class ZarrSaver(Saver):
             -   Unlike HDF5, zarr supports concurrent reads and writes from multiple
                 processes, making it suitable for distributed computing environments.
         """
-        if not HAS_ZARR:
+        if not has_zarr:
             raise ImportError("Zarr is not installed.")
 
         arr = np.array(data)

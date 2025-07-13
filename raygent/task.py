@@ -1,11 +1,15 @@
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 from abc import ABC
+from collections.abc import Collection
 
 from loguru import logger
 
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
 
-class Task(ABC):
+
+class Task(ABC, Generic[InputType, OutputType]):
     """Abstract base class for executing computational tasks on collections of data.
 
     The `Task` class provides a flexible framework for processing data items either
@@ -37,7 +41,7 @@ class Task(ABC):
         Basic implementation example:
 
         ```python
-        class TextAnalyzerTask(Task):
+        class TextAnalyzerTask(Task[str, dict[str, Any]]):
             def __init__(self):
                 self.nlp = load_nlp_model()  # Load model once per task instance
 
@@ -63,7 +67,7 @@ class Task(ABC):
         Implementing both processing methods:
 
         ```python
-        class DataProcessorTask(Task):
+        class DataProcessorTask(Task[npt.NDArray[np.generic], dict[str, Any]]):
             def process_item(self, item, **kwargs):
                 # For processing single items with detailed error handling
                 try:
@@ -96,14 +100,14 @@ class Task(ABC):
 
 
         # Create a custom task
-        class MyTask(Task):
+        class MyTask(Task[float, float]):
             def process_item(self, item, **kwargs):
                 return item * 2
 
 
         # Process items using TaskManager (handles parallelization)
         manager = TaskManager(MyTask, use_ray=True, n_cores=4)
-        manager.submit_tasks([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        manager.submit_tasks([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0])
         results = manager.get_results()
         ```
 
@@ -120,9 +124,24 @@ class Task(ABC):
             consistent interface for the execution framework.
     """
 
+    def setup(self, **kwargs: dict[str, Any]) -> None:
+        """
+        Optional setup method called once before processing begins.
+        Useful for setting up connections or loading shared resources.
+        """
+
+    def teardown(self) -> None:
+        """
+        Optional teardown method called once after all processing is complete.
+        Useful for closing connections or releasing resources.
+        """
+
     def run(
-        self, items: list[Any], at_once: bool = False, **kwargs: dict[str, Any]
-    ) -> list[Any]:
+        self,
+        items: Collection[InputType],
+        at_once: bool = False,
+        **kwargs: dict[str, Any],
+    ) -> list[OutputType | tuple[str, str]]:
         """Processes a list of items using either individual or batch processing.
 
         This method serves as the primary entry point for task execution.
@@ -178,25 +197,21 @@ class Task(ABC):
             Individual processing (default):
 
             ```python
-            class NumberSquarerTask(Task):
+            class NumberSquarerTask(Task[float, float]):
                 def process_item(self, item, **kwargs):
                     return item**2
 
 
             task = NumberSquarerTask()
-            results = task.run([1, 2, 3, 4, 5])
-            # results = [1, 4, 9, 16, 25]
+            results = task.run([1.0, 2.0, 3.0, 4.0, 5.0])
+            # results = [1., 4., 9., 16., 25.]
             ```
 
             Batch processing:
 
             ```python
-            class VectorMultiplierTask(Task):
+            class VectorMultiplierTask(Task[npt.NDArray[np.generic], list[float]]):
                 def process_items(self, items, **kwargs):
-                    import numpy as np
-
-                    # Convert to numpy array for efficient vector operations
-                    arr = np.array(items)
                     # Apply scaling factor from kwargs if provided
                     scale = kwargs.get("scale", 1.0)
                     return (arr * scale).tolist()
@@ -210,7 +225,7 @@ class Task(ABC):
             Error handling with individual processing:
 
             ```python
-            class DivisionTask(Task):
+            class DivisionTask(Task[float, float]):
                 def process_item(self, item, **kwargs):
                     divisor = kwargs.get("divisor", 2)
                     return item / divisor
@@ -223,6 +238,7 @@ class Task(ABC):
             #        ('error', 'division by zero'), ('error', 'division by zero')]
             ```
         """
+        self.setup(**kwargs)
         results = []
         if at_once:
             results = self.process_items(items, **kwargs)
@@ -234,9 +250,10 @@ class Task(ABC):
                 except Exception as e:
                     logger.exception(f"Error processing item {item}: {e}")
                     results.append(("error", str(e)))
+        self.teardown(**kwargs)
         return results
 
-    def process_item(self, item: Any, **kwargs: dict[str, Any]) -> Any:
+    def process_item(self, item: InputType, **kwargs: dict[str, Any]) -> Any:
         """Processes a single item independently.
 
         This method defines the computation logic for processing an individual item.
@@ -271,7 +288,7 @@ class Task(ABC):
 
         Example:
             ```python
-            class TextClassifierTask(Task):
+            class TextClassifierTask(Task[str, dict[str, Any]]):
                 def __init__(self):
                     # This setup happens once per task instance
                     self.model = load_classification_model()
@@ -287,7 +304,9 @@ class Task(ABC):
         """
         raise NotImplementedError
 
-    def process_items(self, items: list[Any], **kwargs: dict[str, Any]) -> list[Any]:
+    def process_items(
+        self, items: list[InputType], **kwargs: dict[str, Any]
+    ) -> list[Any]:
         """Processes multiple items at once in a batch operation.
 
         This method defines the computation logic for batch processing a collection
@@ -328,7 +347,7 @@ class Task(ABC):
 
         Example:
             ```python
-            class DocumentVectorizerTask(Task):
+            class DocumentVectorizerTask(Task[str, list[dict[str, Any]]]):
                 def process_items(self, items, **kwargs):
                     # Load model once for all documents
                     vectorizer = load_large_language_model()

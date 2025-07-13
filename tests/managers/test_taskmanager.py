@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from raygent import Task, TaskManager
@@ -13,13 +15,13 @@ class DummySaver:
         self.saved_data.append(data)
 
 
-class DummyTask(Task):
+class DummyTask(Task[int, float]):
     """A dummy task that doubles the input."""
 
-    def process_item(self, item, **kwargs):
+    def process_item(self, item: int, **kwargs: dict[str, Any]) -> float:
         return item * 2
 
-    def process_items(self, items, **kwargs):
+    def process_items(self, items: list[int], **kwargs: dict[str, Any]) -> list[float]:
         return [item * 2 for item in items]
 
 

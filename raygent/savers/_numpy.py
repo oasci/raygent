@@ -7,9 +7,9 @@ from raygent.savers import Saver
 try:
     import numpy as np
 
-    HAS_NUMPY = True
+    has_numpy = True
 except ImportError:
-    HAS_NUMPY = False
+    has_numpy = False
 
 
 class NumpySaver(Saver):
@@ -188,7 +188,7 @@ class NumpySaver(Saver):
             - For large datasets, consider using HDF5Saver or ZarrSaver which
               have more efficient append and update operations.
         """
-        if not HAS_NUMPY:
+        if not has_numpy:
             raise ImportError("NumPy is not installed.")
 
         arr = np.array(data)

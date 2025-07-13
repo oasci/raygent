@@ -9,9 +9,9 @@ from raygent.savers import ZarrSaver
 try:
     import zarr
 
-    HAS_ZARR = True
+    has_zarr = True
 except ImportError:
-    HAS_ZARR = False
+    has_zarr = False
 
 
 @pytest.fixture
@@ -20,7 +20,7 @@ def test_data() -> list[int]:
     return [1, 2, 3, 4, 5]
 
 
-@pytest.mark.skipif(not HAS_ZARR, reason="Zarr is not installed.")
+@pytest.mark.skipif(not has_zarr, reason="Zarr is not installed.")
 class TestZarrSaver:
     @pytest.fixture
     def zarr_temp_path(self, path_tmp: str) -> str:
@@ -94,11 +94,11 @@ class TestZarrSaver:
             saver.save(test_data)
 
 
-@pytest.mark.skipif(not HAS_ZARR, reason="Zarr is not installed.")
+@pytest.mark.skipif(not has_zarr, reason="Zarr is not installed.")
 def test_zarr_import_error(monkeypatch, test_data, path_tmp):
     """
     If you want to test that a missing Zarr installation raises ImportError.
-    We can monkey-patch HAS_ZARR to False and ensure .save(...) raises ImportError.
+    We can monkey-patch has_zarr to False and ensure .save(...) raises ImportError.
     """
     from raygent.savers import ZarrSaver
 
@@ -106,8 +106,8 @@ def test_zarr_import_error(monkeypatch, test_data, path_tmp):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
 
-    # Force HAS_ZARR = False
-    monkeypatch.setattr("raygent.savers._zarr.HAS_ZARR", False)
+    # Force has_zarr = False
+    monkeypatch.setattr("raygent.savers._zarr.has_zarr", False)
 
     saver = FakeZarrSaver(file_path="dummy.zarr", dataset_name="dummy")
     with pytest.raises(ImportError):

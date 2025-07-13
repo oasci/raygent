@@ -1,29 +1,35 @@
-from typing import Any, Generator
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from collections.abc import Callable
+from collections.abc import Generator
 
 try:
     import ray
 
     from raygent.worker import ray_worker
 
-    HAS_RAY = True
+    has_ray = True
 except ImportError:
-    HAS_RAY = False
+    has_ray = False
 from loguru import logger
 
 from raygent.results import BaseResultHandler, ListResultHandler
 from raygent.savers import Saver
 
+if TYPE_CHECKING:
+    from raygent import Task
 
-class TaskManager:
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+
+
+class TaskManager(Generic[InputType, OutputType]):
     """
     A manager class for handling task submissions and result collection using Ray's Task Parallelism.
     """
 
     def __init__(
         self,
-        task_class: Callable[[], Any],
+        task_class: "Task[InputType, OutputType]",
         result_handler: BaseResultHandler | None = None,
         n_cores: int = -1,
         use_ray: bool = False,
@@ -44,7 +50,8 @@ class TaskManager:
             n_cores_worker: The number of cores allocated for each worker.
                 Default is 1.
         """
-        self.task_class = task_class
+
+        self.task_class: Task[InputType, OutputType] = task_class
         """
         A callable that returns a Task instance.
 
@@ -67,7 +74,11 @@ class TaskManager:
         TODO:
         """
 
-        self.use_ray = use_ray
+        assert isinstance(use_ray, bool), "use_ray must be a bool"
+        if use_ray is True and not has_ray:
+            raise ImportError("Requested to use ray, but ray is not installed.")
+
+        self.use_ray: bool = use_ray
         """
         Boolean flag controlling whether to use Ray for parallel execution.
 
@@ -88,10 +99,11 @@ class TaskManager:
             ```
         """
 
-        if use_ray is True and not HAS_RAY:
-            raise ImportError("Requested to use ray, but ray is not installed.")
+        if isinstance(n_cores, float):
+            n_cores = int(n_cores)
+        assert isinstance(n_cores, int), "n_cores must be an int"
 
-        self.n_cores = n_cores
+        self.n_cores: int = n_cores
         """
         The total number of CPU cores available for parallel execution.
 
@@ -112,7 +124,11 @@ class TaskManager:
             ```
         """
 
-        self.n_cores_worker = n_cores_worker
+        if isinstance(n_cores_worker, float):
+            n_cores_worker = int(n_cores_worker)
+        assert isinstance(n_cores_worker, int), "n_cores_worker must be an int"
+
+        self.n_cores_worker: int = n_cores_worker
         """
         The number of CPU cores allocated to each worker process.
 
@@ -135,7 +151,7 @@ class TaskManager:
             ```
         """
 
-        self.futures: list[ray.ObjectRef] = []  # type: ignore
+        self.futures: list["ray.ObjectRef"] = []
         """
         A list of Ray object references for currently submitted tasks.
 
