@@ -1,7 +1,7 @@
 from typing import Any, Generic, TypeVar
 
 from abc import ABC
-from collections.abc import Collection
+from collections.abc import Collection, Generator
 
 from loguru import logger
 
@@ -138,7 +138,7 @@ class Task(ABC, Generic[InputType, OutputType]):
 
     def run(
         self,
-        items: Collection[InputType],
+        items: InputType | Generator[InputType] | Collection[InputType],
         at_once: bool = False,
         **kwargs: dict[str, Any],
     ) -> list[OutputType | tuple[str, str]]:
@@ -307,7 +307,9 @@ class Task(ABC, Generic[InputType, OutputType]):
         )
 
     def process_items(
-        self, items: Collection[InputType], **kwargs: dict[str, Any]
+        self,
+        items: InputType | Generator[InputType] | Collection[InputType],
+        **kwargs: dict[str, Any],
     ) -> list[OutputType]:
         """Processes multiple items at once in a batch operation.
 
