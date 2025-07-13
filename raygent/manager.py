@@ -294,7 +294,7 @@ class TaskManager(Generic[InputType, OutputType]):
 
     def task_generator(
         self, items: Iterable[InputType], chunk_size: int
-    ) -> Generator[list[InputType], None, None]:
+    ) -> Generator[list[InputType]]:
         """
         Splits a list of items into smaller chunks and yields each chunk for processing.
 
@@ -331,7 +331,7 @@ class TaskManager(Generic[InputType, OutputType]):
 
     def submit_tasks(
         self,
-        items: Iterable[InputType],
+        items: Generator[InputType] | Iterable[InputType],
         chunk_size: int = 100,
         saver: Saver | None = None,
         at_once: bool = False,
@@ -438,7 +438,10 @@ class TaskManager(Generic[InputType, OutputType]):
         self.saver = saver
         self.save_interval = save_interval
 
-        task_gen = self.task_generator(items, chunk_size)
+        if isinstance(items, Generator):
+            task_gen = items
+        else:
+            task_gen = self.task_generator(items, chunk_size)
 
         if self.use_ray:
             self._submit_ray(task_gen, at_once, kwargs_task, kwargs_remote)
