@@ -8,9 +8,7 @@ from raygent import ResultHandler, Task, TaskManager
 class DummyTask(Task[list[float], list[float]]):
     """A dummy task that doubles the input."""
 
-    def process_items(
-        self, items: list[float], **kwargs: dict[str, Any]
-    ) -> list[float]:
+    def do(self, items: list[float], **kwargs: dict[str, Any]) -> list[float]:
         return [item * 2 for item in items]
 
 

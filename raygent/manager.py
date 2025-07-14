@@ -25,7 +25,8 @@ OutputType = TypeVar("OutputType")
 
 class TaskManager(Generic[InputType, OutputType]):
     """
-    A manager class for handling task submissions and result collection using Ray's Task Parallelism.
+    A manager class for handling task submissions and result collection using serial
+    computations or Ray's Parallelism.
     """
 
     def __init__(
@@ -36,45 +37,38 @@ class TaskManager(Generic[InputType, OutputType]):
         use_ray: bool = False,
         n_cores_worker: int = 1,
     ) -> None:
-        """Initializes the TaskManager.
-
-        Creates a new TaskManager instance configured for either sequential or
-        parallel task execution using the specified task class.
-
+        """
         Args:
-            task: A callable that returns an instance with a `run` method for
+            task: A callable that returns an instance with a `run_chunk` method for
                 processing each item.
+            result_handler: Class that collects, processes, and handles all
+                [`Result`][results.result.Result]s after calling
+                [`run_chunk`][task.Task.run_chunk] on `task`. Defaults to
+                [`ResultHandler`][results.handler.ResultHandler].
             n_cores: Number of parallel tasks to run. If <= 0, uses all available CPUs.
-                Default is -1 (use all available cores).
+                Default is to use all available cores (i.e., `-1`).
             use_ray: Flag to determine if Ray should be used for parallel execution.
-                If False, runs tasks sequentially. Default is False.
+                If `False`, runs tasks sequentially.
             n_cores_worker: The number of cores allocated for each worker.
-                Default is 1.
         """
 
         self.task: Task[InputType, OutputType] = task
         """
-        A callable that returns a Task instance.
+        A class instance that follows the [`Task`][task.Task] protocol.
 
-        This callable must return an object that implements the Task interface,
-        with `run`, `process_item`, and/or `process_items` methods. It is invoked
-        to create a new Task instance for each worker when using Ray, or once for
-        sequential processing.
-
-        Example:
-            ```python
-            def create_analyzer_task():
-                return TextAnalyzerTask()
-
-            manager = TaskManager(create_analyzer_task())
-            ```
+        This callable must return an object that implements the [`Task`][task.Task]
+        interface, with [`do`][task.Task.do] and [`run_chunk`][task.Task.run_chunk]
+        methods.
         """
 
         if result_handler is None:
             result_handler = ResultHandler()
         self.result_handler: ResultHandler[OutputType] = result_handler
         """
-        TODO:
+        Class that collects, processes, and handles all
+        [`Result`][results.result.Result]s after calling
+        [`run_chunk`][task.Task.run_chunk] on `task`. Defaults to
+        [`ResultHandler`][results.handler.ResultHandler].
         """
 
         assert isinstance(use_ray, bool), "use_ray must be a bool"
@@ -85,20 +79,16 @@ class TaskManager(Generic[InputType, OutputType]):
         """
         Boolean flag controlling whether to use Ray for parallel execution.
 
-        When True, tasks are distributed across multiple cores or machines using Ray.
-        When False, tasks are executed sequentially in the current process.
-
-        Set this to True for computationally intensive workloads that can benefit
-        from parallelization, and False for debugging or when the overhead of
-        distributing tasks outweighs the benefits.
+        When `True`, tasks are distributed across multiple cores or machines using Ray.
+        When `False`, tasks are executed sequentially in the current process.
 
         Example:
             ```python
-            # Sequential processing (for debugging)
+            # Sequential processing
             manager = TaskManager(MyTask(), ResultHandler(), use_ray=False)
 
-            # Parallel processing (for production)
-            manager = TaskManager(MyTask(), ResultHandler(), use_ray=True, n_cores=8)
+            # Parallel processing
+            manager = TaskManager(MyTask(), ResultHandler(), use_ray=True)
             ```
         """
 
@@ -111,7 +101,7 @@ class TaskManager(Generic[InputType, OutputType]):
         The total number of CPU cores available for parallel execution.
 
         This value determines the overall parallelism level when `use_ray=True`.
-        A value of -1 or any negative number will use all available CPU cores
+        A value of `-1` or any negative number will use all available CPU cores
         on the system. For specific resource allocation, set to a positive integer.
 
         For cluster environments, this represents the total cores available
@@ -122,7 +112,7 @@ class TaskManager(Generic[InputType, OutputType]):
             # Use all available cores
             manager = TaskManager(MyTask(), use_ray=True, n_cores=-1)
 
-            # Use exactly 4 cores
+            # Use up to 4 cores
             manager = TaskManager(MyTask(), use_ray=True, n_cores=4)
             ```
         """
@@ -137,9 +127,9 @@ class TaskManager(Generic[InputType, OutputType]):
 
         This controls how many cores each task instance can utilize. Increase this
         value for compute-intensive tasks that can leverage multiple cores per task,
-        or keep at 1 for maximum parallelism across tasks.
+        or keep at `1` for maximum parallelism across tasks.
 
-        The effective parallelism is determined by n_cores // n_cores_worker.
+        The effective parallelism is determined by `n_cores // n_cores_worker`.
 
         Example:
             ```python
@@ -164,85 +154,6 @@ class TaskManager(Generic[InputType, OutputType]):
 
         This list is empty when not using Ray or when no tasks are currently running.
         Users typically do not need to interact with this attribute directly.
-        """
-
-        self.results: list[Any] = []
-        """
-        A list storing the results of all completed tasks.
-
-        This attribute accumulates the outputs from all Task.run calls, maintaining
-        the order in which tasks complete (which may differ from submission order
-        when using Ray). Results are added here after tasks complete and optionally
-        after being processed by a saver.
-
-        Access this list using the get_results() method after task submission.
-
-        Example:
-            ```python
-            manager = TaskManager(MyTask())
-            manager.submit_tasks(items)
-            results = manager.get_results()  # Access the contents of this attribute
-            ```
-        """
-
-        self.saver: Saver | None = None
-        """
-        An optional Saver instance for persisting results.
-
-        When provided, this Saver is used to save results at intervals specified by
-        save_interval. This allows for checkpointing and persistence of intermediate
-        results during long-running computations.
-
-        The saver must implement the Saver interface with a save(data) method.
-        Set during submit_tasks() and not during initialization.
-
-        Example:
-            ```python
-            manager = TaskManager(MyTask())
-            saver = HDF5Saver("results.h5")
-            manager.submit_tasks(items, saver=saver, save_interval=100)
-            ```
-        """
-
-        self.save_interval: int = 1
-        """
-        The number of results to accumulate before invoking the saver.
-
-        This controls how frequently results are saved when a saver is provided.
-        Lower values reduce memory usage but may increase I/O overhead, while higher
-        values can improve I/O efficiency at the cost of increased memory usage.
-
-        Set during submit_tasks() and not during initialization. Default is 1.
-
-        Example:
-            ```python
-            # Save every 100 results (good balance)
-            manager.submit_tasks(items, saver=my_saver, save_interval=100)
-
-            # Save every 1000 results (reduce I/O, more memory usage)
-            manager.submit_tasks(items, saver=my_saver, save_interval=1000)
-            ```
-        """
-
-        self.save_kwargs: dict[str, Any] = dict()
-        """
-        Additional keyword arguments passed to the saver's save method.
-
-        This dictionary contains any extra parameters needed by the saver when
-        saving results. It can include file paths, database connections, or
-        other configuration options specific to the saver implementation.
-
-        Example:
-            ```python
-            # Set up a manager with save options
-            manager = TaskManager(MyTask())
-            manager.save_kwargs = {
-                "compression": "gzip",
-                "append": True,
-                "dtype": "float32"
-            }
-            manager.submit_tasks(items, saver=my_saver)
-            ```
         """
 
     @property
@@ -369,7 +280,7 @@ class TaskManager(Generic[InputType, OutputType]):
                 saved according to `save_interval`.
             save_interval: The number of results to accumulate before invoking the
                 `saver`. Has no effect if `saver` is `None`.
-            kwargs_task: Keyword arguments to pass to the task's run method.
+            kwargs_task: Keyword arguments to pass to the task's run_chunk method.
                 These can be used to customize task execution behavior.
             kwargs_remote: Keyword arguments to pass to Ray's remote function options.
                 Only used when `use_ray=True`. Can include options like `max_retries`,
@@ -462,20 +373,20 @@ class TaskManager(Generic[InputType, OutputType]):
         (i.e., without parallelization via Ray). For each chunk produced by the
         [`task_gen`][manager.TaskManager.task_generator] generator, a new
         task instance is created from [`self.task`][task.Task] and its
-        [`run`][task.Task.run] method is invoked.
+        [`run_chunk`][task.Task.run_chunk] method is invoked.
 
         Args:
             task_gen: Generator yielding chunks of items to process.
             kwargs_task: Additional keyword arguments to pass to the task's
-                `run` method.
+                `run_chunk` method.
 
         Returns:
             None. The processed results are stored in the instance attribute
                 `self.results`.
         """
         logger.debug("Running tasks in serial")
-        for chunk in task_gen:
-            results_chunk = self.task.run(items=chunk, **kwargs_task)
+        for index, chunk in task_gen:
+            results_chunk = self.task.run_chunk(index, chunk, **kwargs_task)
             self.result_handler.add_result(results_chunk)
             self.result_handler.save()
 
@@ -529,7 +440,7 @@ class TaskManager(Generic[InputType, OutputType]):
             self.n_cores = n_cores
 
         # Submit tasks and process completed ones as we go.
-        for chunk in task_gen:
+        for index, chunk in task_gen:
             # If the maximum concurrency is reached, wait for one task to finish.
             if len(self.futures) >= self.max_concurrent_tasks:
                 done_futures, self.futures = ray.wait(self.futures, num_returns=1)
@@ -542,7 +453,7 @@ class TaskManager(Generic[InputType, OutputType]):
             logger.debug(f"Submitting Ray task which index of {chunk[0]}")
             future = ray_worker.options(
                 num_cpus=self.n_cores_worker, **kwargs_remote
-            ).remote(self.task, chunk, **kwargs_task)
+            ).remote(self.task, index, chunk, **kwargs_task)
             self.futures.append(future)
 
         # Process any remaining futures.
@@ -566,7 +477,7 @@ class TaskManager(Generic[InputType, OutputType]):
         Returns:
             A list containing the results from all completed tasks. The structure
                 of individual results depends on what was returned by the Task's
-                process_item or process_items methods.
+                process_item or do methods.
 
         Notes:
             - This method simply returns the internal results list attribute

@@ -14,6 +14,7 @@ OutputType = TypeVar("OutputType")
 @ray.remote
 def ray_worker(
     task: "Task[InputType, OutputType]",
+    index: int,
     chunk: InputType | Iterable[InputType],
     **kwargs: dict[str, Any],
 ) -> OutputType:
@@ -22,7 +23,7 @@ def ray_worker(
     Remote Ray worker function that processes tasks in parallel.
 
     This function is a helper wrapper around a [`Task`][task.Task] object that executes
-    the task's run method with the provided chunk of data. It serves as the core
+    the task's run_chunk method with the provided chunk of data. It serves as the core
     execution unit when using Ray for parallel processing within the `raygent`
     framework.
 
@@ -32,17 +33,18 @@ def ray_worker(
 
     Args:
         task: A callable that returns a [`Task`][task.Task] instance with
-            [`run`][task.Task.run] and [`process_item`][task.Task.process_item]
-            or [`process_items`][task.Task.process_items] methods.
+            [`run_chunk`][task.Task.run_chunk] and [`process_item`][task.Task.process_item]
+            or [`do`][task.Task.do] methods.
+        index: Chunk index.
         chunk: A list of items to be processed by the task.
         *args: Additional positional arguments passed to the task's
-            [`run`][task.Task.run] method.
+            [`run_chunk`][task.Task.run_chunk] method.
         **kwargs: Additional keyword arguments passed to the task's
-            [`run`][task.Task.run] method. These can include task-specific parameters
+            [`run_chunk`][task.Task.run_chunk] method. These can include task-specific parameters
             that customize execution.
 
     Returns:
-        The results from executing the task's run method on the provided chunk.
+        The results from executing the task's run_chunk method on the provided chunk.
             Typically this is a list of processed items or results.
 
     Examples:
@@ -91,4 +93,4 @@ def ray_worker(
         This function is decorated with `@ray.remote`, making it a Ray remote function
         that can be executed on any worker in the Ray cluster.
     """
-    return task.run(chunk, **kwargs)
+    return task.run_chunk(index, chunk, **kwargs)

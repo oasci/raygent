@@ -6,9 +6,7 @@ from raygent import ResultHandler, Task, TaskManager
 class DummyTask(Task[list[float], list[float]]):
     """A dummy task that doubles the input."""
 
-    def process_items(
-        self, items: list[float], **kwargs: dict[str, Any]
-    ) -> list[float]:
+    def do(self, items: list[float], **kwargs: dict[str, Any]) -> list[float]:
         return [item * 2 for item in items]
 
 
@@ -35,7 +33,7 @@ def test_submit_tasks_sequential():
     assert flattened == [2, 4, 6, 8, 10]
 
 
-def test_max_concurrent_tasks():
+def test_submit_tasks_parallel():
     task_manager = TaskManager[list[float], list[float]](DummyTask(), use_ray=True)
     task_manager.n_cores = 2
     task_manager.n_cores_worker = 1

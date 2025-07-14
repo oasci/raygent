@@ -45,7 +45,7 @@ from raygent import Task, TaskManager
 
 # Define your task
 class SquareTask(Task[list[float], list[float]]):
-    def process_items(self, items):
+    def do(self, items):
         return [item ** 2 for item in items]
 
 # Create a task manager
