@@ -66,7 +66,7 @@ class TaskManager(Generic[InputType, OutputType]):
             def create_analyzer_task():
                 return TextAnalyzerTask()
 
-            manager = TaskManager(create_analyzer_task)
+            manager = TaskManager(create_analyzer_task())
             ```
         """
 
@@ -95,10 +95,10 @@ class TaskManager(Generic[InputType, OutputType]):
         Example:
             ```python
             # Sequential processing (for debugging)
-            manager = TaskManager(MyTask, ResultHandler(), use_ray=False)
+            manager = TaskManager(MyTask(), ResultHandler(), use_ray=False)
 
             # Parallel processing (for production)
-            manager = TaskManager(MyTask, ResultHandler(), use_ray=True, n_cores=8)
+            manager = TaskManager(MyTask(), ResultHandler(), use_ray=True, n_cores=8)
             ```
         """
 
@@ -120,10 +120,10 @@ class TaskManager(Generic[InputType, OutputType]):
         Example:
             ```python
             # Use all available cores
-            manager = TaskManager(MyTask, use_ray=True, n_cores=-1)
+            manager = TaskManager(MyTask(), use_ray=True, n_cores=-1)
 
             # Use exactly 4 cores
-            manager = TaskManager(MyTask, use_ray=True, n_cores=4)
+            manager = TaskManager(MyTask(), use_ray=True, n_cores=4)
             ```
         """
 
@@ -144,13 +144,13 @@ class TaskManager(Generic[InputType, OutputType]):
         Example:
             ```python
             # Each task gets 1 core (maximum task parallelism)
-            manager = TaskManager(SimpleTask, use_ray=True, n_cores_worker=1)
+            manager = TaskManager(SimpleTask(), use_ray=True, n_cores_worker=1)
 
             # Each task gets 2 cores (good for moderately parallel tasks)
-            manager = TaskManager(ComputeTask, use_ray=True, n_cores_worker=2)
+            manager = TaskManager(ComputeTask(), use_ray=True, n_cores_worker=2)
 
             # Each task gets 4 cores (for tasks with internal parallelism)
-            manager = TaskManager(ParallelTask, use_ray=True, n_cores_worker=4)
+            manager = TaskManager(ParallelTask(), use_ray=True, n_cores_worker=4)
             ```
         """
 
@@ -179,7 +179,7 @@ class TaskManager(Generic[InputType, OutputType]):
 
         Example:
             ```python
-            manager = TaskManager(MyTask)
+            manager = TaskManager(MyTask())
             manager.submit_tasks(items)
             results = manager.get_results()  # Access the contents of this attribute
             ```
@@ -198,7 +198,7 @@ class TaskManager(Generic[InputType, OutputType]):
 
         Example:
             ```python
-            manager = TaskManager(MyTask)
+            manager = TaskManager(MyTask())
             saver = HDF5Saver("results.h5")
             manager.submit_tasks(items, saver=saver, save_interval=100)
             ```
@@ -235,7 +235,7 @@ class TaskManager(Generic[InputType, OutputType]):
         Example:
             ```python
             # Set up a manager with save options
-            manager = TaskManager(MyTask)
+            manager = TaskManager(MyTask())
             manager.save_kwargs = {
                 "compression": "gzip",
                 "append": True,
@@ -275,16 +275,16 @@ class TaskManager(Generic[InputType, OutputType]):
         Examples:
             ```python
             # With 8 total cores and 2 cores per worker
-            manager = TaskManager(MyTask, n_cores=8, n_cores_worker=2, use_ray=True)
+            manager = TaskManager(MyTask(), n_cores=8, n_cores_worker=2, use_ray=True)
             print(manager.max_concurrent_tasks)  # Output: 4
 
             # With 16 total cores and 4 cores per worker
-            manager = TaskManager(MyTask, n_cores=16, n_cores_worker=4, use_ray=True)
+            manager = TaskManager(MyTask(), n_cores=16, n_cores_worker=4, use_ray=True)
             print(manager.max_concurrent_tasks)  # Output: 4
 
             # With 24 total cores and 1 core per worker (for I/O-bound tasks)
             manager = TaskManager(
-                IOBoundTask, n_cores=24, n_cores_worker=1, use_ray=True
+                IOBoundTask(), n_cores=24, n_cores_worker=1, use_ray=True
             )
             print(manager.max_concurrent_tasks)  # Output: 24
             ```
@@ -398,7 +398,7 @@ class TaskManager(Generic[InputType, OutputType]):
 
             ```python
             # Create a task manager for sequential processing
-            manager = TaskManager(NumberSquareTask, use_ray=False)
+            manager = TaskManager(NumberSquareTask(), use_ray=False)
 
             # Process items without saving results
             manager.submit_tasks([1, 2, 3, 4, 5])
@@ -409,7 +409,7 @@ class TaskManager(Generic[InputType, OutputType]):
 
             ```python
             # Create a task manager with Ray for parallel processing
-            manager = TaskManager(TextProcessorTask, use_ray=True, n_cores=8)
+            manager = TaskManager(TextProcessorTask(), use_ray=True, n_cores=8)
 
             # Process a large list of items in chunks of 50
             manager.submit_tasks(
@@ -424,7 +424,7 @@ class TaskManager(Generic[InputType, OutputType]):
 
             ```python
             # Create a task manager and a saver for results
-            manager = TaskManager(DataAnalysisTask, use_ray=True)
+            manager = TaskManager(DataAnalysisTask(), use_ray=True)
             saver = HDF5Saver("results.h5", dataset_name="analysis_results")
 
             # Process items with saving every 1000 results
@@ -578,7 +578,7 @@ class TaskManager(Generic[InputType, OutputType]):
         Examples:
             ```python
             # Create a task manager and submit tasks
-            manager = TaskManager(NumberSquareTask)
+            manager = TaskManager(NumberSquareTask())
             manager.submit_tasks([1, 2, 3, 4, 5])
 
             # Retrieve and use results

@@ -50,7 +50,7 @@ def ray_worker(
 
         ```python
         # This is handled automatically by TaskManager when use_ray=True
-        manager = TaskManager(MyTask, use_ray=True)
+        manager = TaskManager(MyTask(), use_ray=True)
         manager.submit_tasks(items)
         ```
 
@@ -91,5 +91,4 @@ def ray_worker(
         This function is decorated with `@ray.remote`, making it a Ray remote function
         that can be executed on any worker in the Ray cluster.
     """
-    result = task.run(chunk, *args, **kwargs)
-    return result
+    return task.run(chunk, **kwargs)

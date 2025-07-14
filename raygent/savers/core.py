@@ -22,7 +22,7 @@ class Saver(ABC):
 
         ```python
         # Create a TaskManager with a Saver
-        task_manager = TaskManager(MyTask, use_ray=True)
+        task_manager = TaskManager(MyTask(), use_ray=True)
         saver = HDF5Saver("results.h5", dataset_name="experiment_1")
 
         # Submit tasks with periodic saving

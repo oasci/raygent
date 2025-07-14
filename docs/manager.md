@@ -19,7 +19,7 @@ The [`TaskManager`][manager.TaskManager] constructor initializes the execution e
 from raygent import TaskManager
 from my_tasks import ExampleTask
 
-ray_manager = TaskManager(ExampleTask, n_cores=4, use_ray=True)
+ray_manager = TaskManager(ExampleTask(), n_cores=4, use_ray=True)
 ```
 
 ## Submitting Tasks

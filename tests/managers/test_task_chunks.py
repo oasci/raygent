@@ -18,7 +18,9 @@ class DummyTask(Task[list[float], list[float]]):
 def dummy_task_manager():
     # For testing, use DummyTask and sequential mode (use_ray=False).
     result_handler = ResultHandler()
-    manager = TaskManager(task=DummyTask, result_handler=result_handler, use_ray=False)
+    manager = TaskManager(
+        task=DummyTask(), result_handler=result_handler, use_ray=False
+    )
     return manager
 
 
