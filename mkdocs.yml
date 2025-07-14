@@ -1,10 +1,10 @@
 docs_dir: docs
 
 site_name: raygent
-site_author: oasci
+site_author: OASCI
 
 repo_name: oasci/raygent
-repo_url: https://GitHub.com/oasci/raygent
+repo_url: https://github.com/oasci/raygent
 copyright: <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> by OASCI
 
 # https://squidfunk.github.io/mkdocs-material/
@@ -97,7 +97,6 @@ plugins:
   - awesome-nav
   - glightbox
   - macros
-  - print-site
   - git-revision-date-localized:
       type: iso_datetime
       timezone: America/Detroit
