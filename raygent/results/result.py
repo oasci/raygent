@@ -13,6 +13,13 @@ class Result(Generic[OutputType]):
     """
 
     index: int
+    """Index to specify the order of chunks."""
+
     value: OutputType | None = None
+    """Computed values returned by [`do()`][task.Task.do]."""
+
     error: Exception | None = None
+    """Errors that are captured during [`do()`][task.Task.do]."""
+
     metadata: dict[str, Any] = field(default_factory=dict)
+    """Future-proofing metadata."""

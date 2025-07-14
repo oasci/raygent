@@ -19,13 +19,11 @@ def ray_worker(
     **kwargs: dict[str, Any],
 ) -> OutputType:
     """
-
     Remote Ray worker function that processes tasks in parallel.
 
-    This function is a helper wrapper around a [`Task`][task.Task] object that executes
-    the task's run_chunk method with the provided chunk of data. It serves as the core
-    execution unit when using Ray for parallel processing within the `raygent`
-    framework.
+    This function is a wrapper around a [`Task`][task.Task] object that executes
+    the task's [`run_chunk`][task.Task.run_chunk] method with the provided chunk
+    of data. It serves as the core execution unit when using Ray.
 
     While primarily used internally by [`TaskManager`][manager.TaskManager]'s
     [`_submit_ray`][manager.TaskManager._submit_ray] method, it can be
@@ -35,8 +33,8 @@ def ray_worker(
         task: A callable that returns a [`Task`][task.Task] instance with
             [`run_chunk`][task.Task.run_chunk] and [`process_item`][task.Task.process_item]
             or [`do`][task.Task.do] methods.
-        index: Chunk index.
-        chunk: A list of items to be processed by the task.
+        index: Chunk index used for [`Result.index`][results.result.Result.index].
+        chunk: `InputType` to be processed by the task.
         *args: Additional positional arguments passed to the task's
             [`run_chunk`][task.Task.run_chunk] method.
         **kwargs: Additional keyword arguments passed to the task's
@@ -65,7 +63,7 @@ def ray_worker(
 
         # Create a remote worker with 2 CPUs
         future = ray_worker.options(num_cpus=2).remote(
-            MyTask, items_chunk, custom_param="value"
+            MyTask, index, chunk, custom_param="value"
         )
 
         # Get results
@@ -80,6 +78,7 @@ def ray_worker(
             num_cpus=4, num_gpus=1, max_retries=3, resources={"custom_resource": 1}
         ).remote(
             ComplexTask,
+            index,
             large_chunk,
             preprocessing_steps=["normalize", "filter"],
             batch_size=64,

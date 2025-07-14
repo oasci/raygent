@@ -19,7 +19,7 @@ The [`TaskManager`][manager.TaskManager] constructor initializes the execution e
 from raygent import TaskManager
 from my_tasks import ExampleTask
 
-ray_manager = TaskManager(ExampleTask(), n_cores=4, use_ray=True)
+manager = TaskManager(ExampleTask(), n_cores=4, use_ray=True)
 ```
 
 ## Submitting Tasks
@@ -27,18 +27,13 @@ ray_manager = TaskManager(ExampleTask(), n_cores=4, use_ray=True)
 Tasks are submitted using [`submit_tasks`][manager.TaskManager.submit_tasks], which divides data into chunks and manages workers efficiently.
 
 ```python
-ray_manager.submit_tasks(
-    items=[1, 2, 3, 4, 5],
-    chunk_size=2,
-    save_func=my_save_function,
-    save_interval=2
-)
+manager.submit_tasks(items=[1, 2, 3, 4, 5], chunk_size=2)
 ```
 
 ## Retrieving Results
 
-Returns a list of all collected results.
+Returns a list of all collected [results][results.result.Result].
 
 ```python
-results = ray_manager.get_results()
+results = manager.get_results()
 ```

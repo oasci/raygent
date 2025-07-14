@@ -27,16 +27,11 @@ It removes boilerplate code and offers a modular approach to managing parallel t
 ## Features
 
 -   **Simple Task-Based API**: Define your computational logic once and automatically scale across cores.
--   **Flexible Execution Modes**: Run tasks either in parallel (using Ray) or sequentially with a single parameter.
+-   **Flexible Execution Modes**: Run tasks either in parallel using Ray or sequentially with a single parameter.
 -   **Resource Optimization**: Automatically detect available CPU cores and manage resource allocation.
 -   **Chunked Processing**: Efficiently process data in optimal batch sizes.
 -   **Intermediate Result Saving**: Save results at customizable intervals with pluggable savers.
 -   **Error Handling**: Built-in error capture and logging.
-
-## Why Raygent?
-
-Parallelizing code with Ray requires significant boilerplate and infrastructure management.
-Raygent abstracts away this complexity with a clean, task-focused API that lets you concentrate on your actual computation logic rather than parallelization mechanics.
 
 ## Quick Start
 
@@ -54,14 +49,13 @@ manager = TaskManager(SquareTask(), use_ray=True)
 # Process items in parallel
 manager.submit_tasks(items=[1., 2., 3., 4., 5.])
 results = manager.get_results()
-print(results)  # [1., 4., 9., 16., 25.]
+print(results.value)  # [1., 4., 9., 16., 25.]
 ```
 
 ## Installation
 
-
 You can install `raygent` directly from the [GitHub repository](https://github.com/oasci/raygent).
-First, clone the [repository](https://github.com/oasci/raygent)
+First, clone the [repository](https://github.com/oasci/raygent).
 
 ```bash
 git clone git@github.com:oasci/raygent.git
@@ -74,7 +68,6 @@ pip install .
 ```
 
 This will install all dependencies and `raygent` into your current Python environment.
-
 To enable `raygent`'s full parallelization capabilities using Ray, install it with the `ray` extra.
 
 ```python
