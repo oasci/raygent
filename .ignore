@@ -7,3 +7,4 @@ public
 .git
 *_cache
 .vscode
+dist
