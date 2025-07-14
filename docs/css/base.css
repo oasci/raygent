@@ -1,7 +1,7 @@
 
 /*Make the content wider and relative to window size.*/
 .md-grid {
-    max-width: 85%
+    max-width: 75%
 }
 
 :root {
