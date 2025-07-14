@@ -117,4 +117,3 @@ class Saver(ABC):
             - The indices parameter is primarily used for update operations,
               and its interpretation varies between Saver implementations.
         """
-        pass

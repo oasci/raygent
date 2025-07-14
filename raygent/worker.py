@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from collections.abc import Iterable
+
 import ray
 
 if TYPE_CHECKING:
@@ -11,12 +13,10 @@ OutputType = TypeVar("OutputType")
 
 @ray.remote
 def ray_worker(
-    task_class: "Task[InputType, OutputType]",
-    chunk: list[Any],
-    at_once: bool,
-    *args: tuple[Any],
+    task: "Task[InputType, OutputType]",
+    chunk: InputType | Iterable[InputType],
     **kwargs: dict[str, Any],
-) -> Any:
+) -> OutputType:
     """
 
     Remote Ray worker function that processes tasks in parallel.
@@ -31,14 +31,10 @@ def ray_worker(
     called directly for custom Ray deployments if needed.
 
     Args:
-        task_class: A callable that returns a [`Task`][task.Task] instance with
+        task: A callable that returns a [`Task`][task.Task] instance with
             [`run`][task.Task.run] and [`process_item`][task.Task.process_item]
             or [`process_items`][task.Task.process_items] methods.
         chunk: A list of items to be processed by the task.
-        at_once: If `True`, processes all items at once using
-            [`process_items`][task.Task.process_items];
-            otherwise, processes each item individually using
-            [`process_item`][task.Task.process_item].
         *args: Additional positional arguments passed to the task's
             [`run`][task.Task.run] method.
         **kwargs: Additional keyword arguments passed to the task's
@@ -67,7 +63,7 @@ def ray_worker(
 
         # Create a remote worker with 2 CPUs
         future = ray_worker.options(num_cpus=2).remote(
-            MyTask, items_chunk, at_once=False, custom_param="value"
+            MyTask, items_chunk, custom_param="value"
         )
 
         # Get results
@@ -83,7 +79,6 @@ def ray_worker(
         ).remote(
             ComplexTask,
             large_chunk,
-            at_once=True,
             preprocessing_steps=["normalize", "filter"],
             batch_size=64,
         )
@@ -96,6 +91,5 @@ def ray_worker(
         This function is decorated with `@ray.remote`, making it a Ray remote function
         that can be executed on any worker in the Ray cluster.
     """
-    task_instance = task_class()
-    result = task_instance.run(chunk, at_once, *args, **kwargs)
+    result = task.run(chunk, *args, **kwargs)
     return result

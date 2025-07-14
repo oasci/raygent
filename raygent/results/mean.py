@@ -5,17 +5,15 @@ from collections.abc import Iterable
 import numpy as np
 import numpy.typing as npt
 
-from raygent.results import ResultAccumulator
+from raygent.results import ResultHandler
 from raygent.savers import Saver
-
 
 OutputType = TypeVar("OutputType")
 
 
-
-class OnlineMeanResultHandler(ResultAccumulator[OutputType]):
+class OnlineMeanResults(ResultHandler[OutputType]):
     r"""
-    `OnlineMeanResultHandler` provides a numerically stable, online (incremental)
+    `OnlineMeanResults` provides a numerically stable, online (incremental)
     algorithm to compute the arithmetic mean of large, streaming, or distributed
     datasets represented as NumPy arrays. In many real-world applications—such a
     distributed computing or real-time data processing—data is processed
@@ -77,7 +75,7 @@ class OnlineMeanResultHandler(ResultAccumulator[OutputType]):
         The total number of observations processed.
         """
 
-    def add_chunk(
+    def add_result(
         self,
         chunk_results: OutputType | Iterable[OutputType],
         chunk_index: int | None = None,
@@ -106,7 +104,7 @@ class OnlineMeanResultHandler(ResultAccumulator[OutputType]):
                 ) * (count / new_total)
                 self.total_count = new_total
 
-    def periodic_save(self, saver: Saver | None, save_interval: int) -> None:
+    def save(self, saver: Saver | None, save_interval: int) -> None:
         """
         Persists the current global mean at periodic intervals if a saver is provided.
 

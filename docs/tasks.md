@@ -9,7 +9,7 @@ By defining a structured pipeline for task execution, users can efficiently scal
 
 ## `run`
 
-The `run` method is responsible for processing multiple items at once. It determines whether to process each item individually using [`process_item`][task.Task.process_item] or to process all items together using [`process_items`][task.Task.process_items] when `at_once=True`. This flexibility allows users to optimize performance by reducing redundant computations in batch operations.
+The `run` method is responsible for processing multiple items at once.
 
 ## `process_item`
 
@@ -49,7 +49,7 @@ class MeanTask(Task[npt.NDArray[np.float64], np.float64]):
 
 task = MeanTask()
 data = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
-print(task.run(data, at_once=True))  # Output: 5.0
+print(task.run(data))  # Output: 5.0
 ```
 
 Using [process_items][task.Task.process_items] ensures optimized performance for numerical computations, making this approach well-suited for tasks involving large-scale data processing.

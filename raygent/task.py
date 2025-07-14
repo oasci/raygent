@@ -1,18 +1,12 @@
-from typing import Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
-# ParamSpec does not have default= (PEP 696) until Python 3.13
-# This import can be replaced once we stop supporting <3.13
-from typing_extensions import ParamSpec
+from raygent.results import Result
 
-from collections.abc import Iterable
-
-InputType = TypeVar("InputType", contravariant=True)
-OutputType = TypeVar("OutputType", covariant=True)
-
-P = ParamSpec("P", default=())  # pyright: ignore[reportGeneralTypeIssues]
+InputType = TypeVar(name="InputType", contravariant=True)
+OutputType = TypeVar(name="OutputType")
 
 
-class Task(Protocol[InputType, OutputType, P]):
+class Task(Protocol[InputType, OutputType]):
     """Protocol for executing computational tasks on collections of data.
 
     The `Task` class provides a flexible framework for processing data items and
@@ -32,22 +26,24 @@ class Task(Protocol[InputType, OutputType, P]):
             in `__init__` will happen per worker.
     """
 
-    def setup(self, *args: P.args, **kwargs: P.kwargs) -> None:
+    def __init__(self) -> None:
+        super().__init__()
+
+    def setup(self, **kwargs: dict[str, Any]) -> None:
         """Optional setup method called once before processing begins."""
 
-    def teardown(self, *args: P.args, **kwargs: P.kwargs) -> None:
+    def teardown(self, **kwargs: dict[str, Any]) -> None:
         """Optional teardown method called once after all processing is complete."""
 
     def run(
         self,
-        items: Iterable[InputType],
-        *args: P.args,
-        **kwargs: P.kwargs,
-    ) -> OutputType | Iterable[OutputType]:
+        items: tuple[int, InputType],
+        **kwargs: dict[str, Any],
+    ) -> Result[OutputType]:
         """This method serves as the primary entry point for task execution.
 
         Args:
-            items: A list of input data items to be processed.
+            items: The chunk index and items to be processed.
             *args: Addutional positional arguments pass to
                 [`startup`][task.Task.startup],
                 [`process_items`][task.Task.process_items], and
@@ -86,19 +82,23 @@ class Task(Protocol[InputType, OutputType, P]):
             results = task.run(items, scale=2.0)
             ```
         """
-        self.setup(*args, **kwargs)
-        results: OutputType | Iterable[OutputType] = self.process_items(
-            items, *args, **kwargs
-        )
-        self.teardown(*args, **kwargs)
-        return results
+        self.setup(**kwargs)
+        assert isinstance(items[0], int), "items needs to be a tuple of index, "
+        result: Result[OutputType] = Result[OutputType](index=items[0])
+        output: OutputType | Exception = self.process_items(items[1], **kwargs)
+        if isinstance(output, Exception):
+            result.error = output
+        else:
+            result.value = output
+
+        self.teardown(**kwargs)
+        return result
 
     def process_items(
         self,
-        items: Iterable[InputType],
-        *args: P.args,
-        **kwargs: P.kwargs,
-    ) -> OutputType | Iterable[OutputType]:
+        items: InputType,
+        **kwargs: dict[str, Any],
+    ) -> OutputType | Exception:
         """Processes multiple items at once in a batch operation.
 
         This method defines the computation logic for batch processing a collection

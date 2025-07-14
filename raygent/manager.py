@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from collections.abc import Generator, Iterable
+from collections.abc import Generator
+from inspect import isgenerator
 
 try:
     import ray
@@ -12,7 +13,7 @@ except ImportError:
     has_ray = False
 from loguru import logger
 
-from raygent.results import ResultAccumulator, ListResults
+from raygent.results import Result, ResultHandler
 from raygent.savers import Saver
 
 if TYPE_CHECKING:
@@ -29,8 +30,8 @@ class TaskManager(Generic[InputType, OutputType]):
 
     def __init__(
         self,
-        task_class: "Task[InputType, OutputType]",
-        result_handler: ResultAccumulator | None = None,
+        task: "Task[InputType, OutputType]",
+        result_handler: ResultHandler[OutputType] | None = None,
         n_cores: int = -1,
         use_ray: bool = False,
         n_cores_worker: int = 1,
@@ -41,7 +42,7 @@ class TaskManager(Generic[InputType, OutputType]):
         parallel task execution using the specified task class.
 
         Args:
-            task_class: A callable that returns an instance with a `run` method for
+            task: A callable that returns an instance with a `run` method for
                 processing each item.
             n_cores: Number of parallel tasks to run. If <= 0, uses all available CPUs.
                 Default is -1 (use all available cores).
@@ -51,7 +52,7 @@ class TaskManager(Generic[InputType, OutputType]):
                 Default is 1.
         """
 
-        self.task_class: Task[InputType, OutputType] = task_class
+        self.task: Task[InputType, OutputType] = task
         """
         A callable that returns a Task instance.
 
@@ -69,7 +70,9 @@ class TaskManager(Generic[InputType, OutputType]):
             ```
         """
 
-        self.result_handler = result_handler or ListResults()
+        if result_handler is None:
+            result_handler = ResultHandler()
+        self.result_handler: ResultHandler[OutputType] = result_handler
         """
         TODO:
         """
@@ -92,15 +95,15 @@ class TaskManager(Generic[InputType, OutputType]):
         Example:
             ```python
             # Sequential processing (for debugging)
-            manager = TaskManager(MyTask, use_ray=False)
+            manager = TaskManager(MyTask, ResultHandler(), use_ray=False)
 
             # Parallel processing (for production)
-            manager = TaskManager(MyTask, use_ray=True, n_cores=8)
+            manager = TaskManager(MyTask, ResultHandler(), use_ray=True, n_cores=8)
             ```
         """
 
         if isinstance(n_cores, float):
-            n_cores = int(n_cores)
+            n_cores: int = int(n_cores)
         assert isinstance(n_cores, int), "n_cores must be an int"
 
         self.n_cores: int = n_cores
@@ -125,7 +128,7 @@ class TaskManager(Generic[InputType, OutputType]):
         """
 
         if isinstance(n_cores_worker, float):
-            n_cores_worker = int(n_cores_worker)
+            n_cores_worker: int = int(n_cores_worker)
         assert isinstance(n_cores_worker, int), "n_cores_worker must be an int"
 
         self.n_cores_worker: int = n_cores_worker
@@ -286,22 +289,20 @@ class TaskManager(Generic[InputType, OutputType]):
             print(manager.max_concurrent_tasks)  # Output: 24
             ```
         """
-        n_tasks = max(1, int(self.n_cores // self.n_cores_worker))
+        n_tasks: int = max(1, int(self.n_cores // self.n_cores_worker))
         logger.debug(f"Total cores: {self.n_cores}")
         logger.debug(f"Cores per worker: {self.n_cores_worker}")
         logger.debug(f"Maximum number of concurrent tasks: {n_tasks}")
         return n_tasks
 
     def task_generator(
-        self, items: Iterable[InputType], chunk_size: int
-    ) -> Generator[list[InputType]]:
+        self, items: InputType | Generator[InputType], chunk_size: int
+    ) -> Generator[tuple[int, InputType]]:
         """
-        Splits a list of items into smaller chunks and yields each chunk for processing.
+        Splits a items into smaller chunks and yields each chunk for processing.
 
-        This generator takes a list of items and partitions it into sublists (chunks)
-        where each chunk contains up to `chunk_size` items. This is useful for
-        processing large datasets in smaller, manageable batches, whether processing
-        sequentially or in parallel using Ray.
+        If we detect that this is a generator, then we will assume it already
+        produces chunks.
 
         Args:
             items: The complete list of items to be processed.
@@ -309,33 +310,39 @@ class TaskManager(Generic[InputType, OutputType]):
                 of items is not evenly divisible by `chunk_size`, the final chunk will
                 contain the remaining items.
 
-        Yields:
-            Each yielded value is a sublist of `items` containing up to
-                `chunk_size` elements.
+                If `items` is already a generator that chunks, then ensure that
+                `chunk_size` is set to `1`.
 
-        Example:
-            ```python
-            >>> items = list(range(10))
-            >>> list(self.task_generator(items, 3))
-            [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]]
-            ```
+        Yields:
+            Each yielded value is a chunk index and sublist of `items` containing up to
+                `chunk_size` elements.
         """
+        index = 0
+
+        is_gen: bool = isgenerator(items)
+        if is_gen:
+            for item in items:
+                yield index, item
+                index += 1
+            return
+
+        # Assume we need to chunk here.
         current_chunk: list[InputType] = []
         for item in items:
             current_chunk.append(item)
-            if len(current_chunk) >= chunk_size:
-                yield current_chunk
+            if len(current_chunk) == chunk_size:
+                yield index, current_chunk
+                index += 1
                 current_chunk = []
         if current_chunk:
-            yield current_chunk
+            yield index, current_chunk
 
     def submit_tasks(
         self,
-        items: Generator[InputType] | Iterable[InputType],
-        chunk_size: int = 100,
+        items: InputType | Generator[InputType],
+        chunk_size: int = 10,
         saver: Saver | None = None,
-        at_once: bool = False,
-        save_interval: int = 100,
+        save_interval: int = 10,
         kwargs_task: dict[str, Any] = dict(),
         kwargs_remote: dict[str, Any] = dict(),
     ) -> None:
@@ -352,18 +359,14 @@ class TaskManager(Generic[InputType, OutputType]):
         persistence of intermediate results during long-running computations.
 
         Args:
-            items: A list of items to process. Each item will be passed to the task's
-                process_item method individually or as part of a batch if
-                `at_once=True`.
+            items: Items to process. This can also be a generator that already
+                chunks the items.
             chunk_size: Number of items per processing chunk. Larger values may improve
-                performance but increase memory usage per worker.
+                performance but increase memory usage per worker. If `items` is
+                already a chunked generator, you
             saver: An optional [`Saver`][savers.core.Saver] instance that implements
                 the save method for persisting results. If provided, results will be
                 saved according to `save_interval`.
-            at_once: If `True`, each chunk is processed as a batch by the task's
-                [`process_items`][task.Task.process_items] method; otherwise,
-                items are processed individually with
-                [`process_item`][task.Task.process_item].
             save_interval: The number of results to accumulate before invoking the
                 `saver`. Has no effect if `saver` is `None`.
             kwargs_task: Keyword arguments to pass to the task's run method.
@@ -435,25 +438,21 @@ class TaskManager(Generic[InputType, OutputType]):
             ```
         """
         logger.info(f"Submitting tasks with chunk_size of {chunk_size}")
-        self.saver = saver
-        self.save_interval = save_interval
+        self.result_handler.saver = saver
+        self.result_handler.save_interval = save_interval
 
-        if isinstance(items, Generator):
-            task_gen = items
-        else:
-            task_gen = self.task_generator(items, chunk_size)
+        task_gen = self.task_generator(items, chunk_size)
 
         if self.use_ray:
-            self._submit_ray(task_gen, at_once, kwargs_task, kwargs_remote)
+            self._submit_ray(task_gen, kwargs_task, kwargs_remote)
         else:
-            self._submit(task_gen, at_once, kwargs_task)
+            self._submit(task_gen, kwargs_task)
 
-        self.result_handler.finalize(self.saver)
+        self.result_handler.finalize()
 
     def _submit(
         self,
-        task_gen: Generator[Any, None, None],
-        at_once: bool = False,
+        task_gen: Generator[tuple[int, InputType]],
         kwargs_task: dict[str, Any] = dict(),
     ) -> None:
         """
@@ -462,25 +461,11 @@ class TaskManager(Generic[InputType, OutputType]):
         This method processes task chunks one at a time in the current process
         (i.e., without parallelization via Ray). For each chunk produced by the
         [`task_gen`][manager.TaskManager.task_generator] generator, a new
-        task instance is created from [`self.task_class`][task.Task] and its
-        [`run`][task.Task.run] method is invoked. Depending on
-        the `at_once` flag, the chunk is processed either as a batch
-        (using [`process_items`][task.Task.process_items]) or
-        item by item (using [`process_item`][task.Task.process_item]).
-
-        As each chunk is processed, the resulting items are appended to a temporary
-        list. If a `Saver`(`self.saver`) is provided and the number of accumulated
-        results meets or exceeds the specified `save_interval`, the Saver's `save`
-        method is called to persist a portion of the results, and the
-        saved results are moved into the final results list (`self.results`).
-
-        After processing all chunks, any remaining results are saved (if applicable)
-        and then appended to the final results list.
+        task instance is created from [`self.task`][task.Task] and its
+        [`run`][task.Task.run] method is invoked.
 
         Args:
             task_gen: Generator yielding chunks of items to process.
-            at_once: If True, processes the entire chunk at once using the task's
-                batch processing method; otherwise, processes each item individually.
             kwargs_task: Additional keyword arguments to pass to the task's
                 `run` method.
 
@@ -490,14 +475,13 @@ class TaskManager(Generic[InputType, OutputType]):
         """
         logger.debug("Running tasks in serial")
         for chunk in task_gen:
-            results_chunk = self.task_class().run(chunk, at_once=at_once, **kwargs_task)
-            self.result_handler.add_chunk(results_chunk)
-            self.result_handler.periodic_save_if_needed(self.saver, self.save_interval)
+            results_chunk = self.task.run(items=chunk, **kwargs_task)
+            self.result_handler.add_result(results_chunk)
+            self.result_handler.save()
 
     def _submit_ray(
         self,
-        task_gen: Generator[Any, None, None],
-        at_once: bool = False,
+        task_gen: Generator[tuple[int, InputType]],
         kwargs_task: dict[str, Any] = dict(),
         kwargs_remote: dict[str, Any] = dict(),
     ) -> None:
@@ -522,9 +506,6 @@ class TaskManager(Generic[InputType, OutputType]):
 
         Args:
             task_gen: A generator that yields chunks of items to process.
-            at_once: If True, each task processes the entire chunk at once using the batch
-                processing method; otherwise, each item in the chunk is processed individually.
-                Defaults to False.
             kwargs_task: Additional keyword arguments to pass to the task's
                 processing function. Defaults to an empty dictionary.
             kwargs_remote: Additional keyword arguments to pass to Ray's remote
@@ -535,6 +516,8 @@ class TaskManager(Generic[InputType, OutputType]):
             None. The final, ordered results are stored in the instance attribute
                 `results`.
         """
+        # pyright: reportUnknownMemberType=false, reportPossiblyUnboundVariable=false
+        # pyright: reportUnknownArgumentType=false
         logger.debug("Running tasks in parallel with Ray")
         if not ray.is_initialized():
             logger.info("Initializing Ray.")
@@ -545,46 +528,32 @@ class TaskManager(Generic[InputType, OutputType]):
             logger.info(f"Ray will be using {n_cores} cores")
             self.n_cores = n_cores
 
-        # Map each Ray future (its string representation) to its corresponding chunk index.
-        indices_future: dict[str, int] = {}
-        chunk_index = 0
-
         # Submit tasks and process completed ones as we go.
         for chunk in task_gen:
             # If the maximum concurrency is reached, wait for one task to finish.
             if len(self.futures) >= self.max_concurrent_tasks:
                 done_futures, self.futures = ray.wait(self.futures, num_returns=1)
                 finished_future = done_futures[0]
-                finished_index = indices_future.pop(str(finished_future))
-                results_chunk = ray.get(finished_future)
-                self.result_handler.add_chunk(
-                    chunk_results=results_chunk, chunk_index=finished_index
-                )
-                self.result_handler.periodic_save_if_needed(
-                    self.saver, self.save_interval
-                )
+                result: Result[OutputType] = ray.get(finished_future)
+                self.result_handler.add_result(result)
+                self.result_handler.save()
 
             # Submit a new task to Ray.
-            logger.debug(f"Submitting Ray task which chunk_index of {chunk_index}")
+            logger.debug(f"Submitting Ray task which index of {chunk[0]}")
             future = ray_worker.options(
                 num_cpus=self.n_cores_worker, **kwargs_remote
-            ).remote(self.task_class, chunk, at_once, **kwargs_task)
+            ).remote(self.task, chunk, **kwargs_task)
             self.futures.append(future)
-            indices_future[str(future)] = chunk_index
-            chunk_index += 1
 
         # Process any remaining futures.
         while self.futures:
             done_futures, self.futures = ray.wait(self.futures, num_returns=1)
             finished_future = done_futures[0]
-            finished_index = indices_future.pop(str(finished_future))
-            results_chunk = ray.get(finished_future)
-            self.result_handler.add_chunk(
-                chunk_results=results_chunk, chunk_index=finished_index
-            )
-            self.result_handler.periodic_save_if_needed(self.saver, self.save_interval)
+            result: Result[OutputType] = ray.get(finished_future)
+            self.result_handler.add_result(result)
+            self.result_handler.save()
 
-    def get_results(self) -> list[Any] | dict[str, Any]:
+    def get_results(self) -> ResultHandler[OutputType]:
         """Retrieves all collected results from completed tasks.
 
         This method provides access to the accumulated results that have been
@@ -620,4 +589,4 @@ class TaskManager(Generic[InputType, OutputType]):
             sum_of_squares = sum(results)  # 55
             ```
         """
-        return self.result_handler.get_results()
+        return self.result_handler

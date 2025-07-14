@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from raygent.results import OnlineMeanResultHandler
+from raygent.results import OnlineMeanResults
 from raygent.savers import Saver
 
 
@@ -16,7 +16,7 @@ class DummySaver(Saver):
 
 
 def test_mean_initial_state():
-    handler = OnlineMeanResultHandler()
+    handler = OnlineMeanResults()
     assert handler.global_mean is None
     assert handler.total_count == 0
     with pytest.raises(ValueError):
@@ -24,33 +24,33 @@ def test_mean_initial_state():
 
 
 def test_mean_single_chunk():
-    handler = OnlineMeanResultHandler()
+    handler = OnlineMeanResults()
     partial_mean = np.array([5.0])
     count = 10
-    handler.add_chunk((partial_mean, count))
+    handler.add_result((partial_mean, count))
     results = handler.get_results()
     np.testing.assert_array_almost_equal(results["mean"], partial_mean)
     assert results["n"] == count
 
 
 def test_mean_multiple_chunks():
-    handler = OnlineMeanResultHandler()
+    handler = OnlineMeanResults()
     # First chunk: mean = [10.0], count = 5.
-    handler.add_chunk((np.array([10.0]), 5))
+    handler.add_result((np.array([10.0]), 5))
     # Second chunk: mean = [20.0], count = 15.
-    handler.add_chunk((np.array([20.0]), 15))
+    handler.add_result((np.array([20.0]), 15))
     results = handler.get_results()
     # Expected mean = (5*10 + 15*20) / (5 + 15) = 350 / 20 = 17.5
     np.testing.assert_array_almost_equal(results["mean"], np.array([17.5]))
     assert results["n"] == 20
 
 
-def test_mean_periodic_save_and_finalize():
-    handler = OnlineMeanResultHandler()
+def test_mean_save_and_finalize():
+    handler = OnlineMeanResults()
     saver = DummySaver()
-    handler.add_chunk((np.array([3.0]), 3))
+    handler.add_result((np.array([3.0]), 3))
     # Trigger periodic saving with a save_interval lower than total_count.
-    handler.periodic_save_if_needed(saver, save_interval=2)
+    handler.save(saver, save_interval=2)
     # Finalize should also trigger a save.
     handler.finalize(saver)
     # Expect two saves.
