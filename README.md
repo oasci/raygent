@@ -44,12 +44,12 @@ Raygent abstracts away this complexity with a clean, task-focused API that lets 
 from raygent import Task, TaskManager
 
 # Define your task
-class SquareTask(Task[float, float]):
-    def process_item(self, item):
-        return item ** 2
+class SquareTask(Task[list[float], list[float]]):
+    def process_items(self, items):
+        return [item ** 2 for item in items]
 
 # Create a task manager
-manager = TaskManager(SquareTask, use_ray=True)
+manager = TaskManager(SquareTask(), use_ray=True)
 
 # Process items in parallel
 manager.submit_tasks(items=[1., 2., 3., 4., 5.])

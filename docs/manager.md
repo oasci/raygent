@@ -16,10 +16,10 @@ Some key features include:
 The [`TaskManager`][manager.TaskManager] constructor initializes the execution environment and prepares task handling.
 
 ```python
-from raygent.manager import TaskManager
+from raygent import TaskManager
 from my_tasks import ExampleTask
 
-ray_manager = TaskManager(ExampleTask, n_cores=4, use_ray=True)
+ray_manager = TaskManager(ExampleTask(), n_cores=4, use_ray=True)
 ```
 
 ## Submitting Tasks

@@ -8,10 +8,11 @@ from ast import literal_eval
 
 from loguru import logger
 
-from raygent.manager import TaskManager
-from raygent.task import Task
+from .manager import TaskManager
+from .task import Task
+from .results import ResultHandler
 
-__all__ = ["TaskManager", "Task"]
+__all__ = ["TaskManager", "Task", "ResultHandler"]
 
 logger.disable("raygent")
 

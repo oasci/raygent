@@ -1,15 +1,19 @@
-from typing import Any
+from typing import Any, TypeVar
+
+from collections.abc import Iterable
 
 import numpy as np
 import numpy.typing as npt
 
-from raygent.results import BaseResultHandler
+from raygent.results import ResultHandler
 from raygent.savers import Saver
 
+OutputType = TypeVar("OutputType")
 
-class OnlineMeanResultHandler(BaseResultHandler):
+
+class OnlineMeanResults(ResultHandler[OutputType]):
     r"""
-    `OnlineMeanResultHandler` provides a numerically stable, online (incremental)
+    `OnlineMeanResults` provides a numerically stable, online (incremental)
     algorithm to compute the arithmetic mean of large, streaming, or distributed
     datasets represented as NumPy arrays. In many real-world applications—such a
     distributed computing or real-time data processing—data is processed
@@ -71,12 +75,9 @@ class OnlineMeanResultHandler(BaseResultHandler):
         The total number of observations processed.
         """
 
-    def add_chunk(
+    def add_result(
         self,
-        chunk_results: (
-            list[tuple[npt.NDArray[np.float64], int]]
-            | tuple[npt.NDArray[np.float64], int]
-        ),
+        chunk_results: OutputType | Iterable[OutputType],
         chunk_index: int | None = None,
         *args: tuple[Any],
         **kwargs: dict[str, Any],
@@ -85,11 +86,9 @@ class OnlineMeanResultHandler(BaseResultHandler):
         Processes one or more chunks of partial results to update the global mean.
 
         Args:
-            chunk_results: Either a single tuple (partial_mean, count) or a list of
-                such tuples. Each partial result must be a tuple consisting of:
-                    - A NumPy array representing the partial mean of a data chunk.
-                    - An integer representing the count of observations in that chunk.
-            chunk_index: An optional index identifier for the chunk (for interface consistency, not used in calculations).
+            chunk_results: Results after running Task.
+            chunk_index: An optional index identifier for the chunk
+                (for interface consistency, not used in calculations).
         """
         if isinstance(chunk_results, tuple):
             chunk_results = [chunk_results]
@@ -105,7 +104,7 @@ class OnlineMeanResultHandler(BaseResultHandler):
                 ) * (count / new_total)
                 self.total_count = new_total
 
-    def periodic_save_if_needed(self, saver: Saver | None, save_interval: int) -> None:
+    def save(self, saver: Saver | None, save_interval: int) -> None:
         """
         Persists the current global mean at periodic intervals if a saver is provided.
 

@@ -1,9 +1,9 @@
-from .base import BaseResultHandler
-from .list_handler import ListResultHandler
-from .mean import OnlineMeanResultHandler
+from .result import Result
+from .handler import ResultHandler
+from .mean import OnlineMeanResults
 
 __all__ = [
-    "BaseResultHandler",
-    "ListResultHandler",
-    "OnlineMeanResultHandler",
+    "Result",
+    "ResultHandler",
+    "OnlineMeanResults",
 ]
