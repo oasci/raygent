@@ -1,15 +1,19 @@
-from typing import Generic
+from typing import Protocol
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from raygent.dtypes import OutputType
 
 
+class Result(Protocol[OutputType]):
+    value: OutputType | None
+    """Computed values returned by [`do()`][task.Task.do]."""
+
+
 @dataclass
-class Result(Generic[OutputType]):
+class IndexedResult(Result[OutputType]):
     """
-    A generic result wrapper holding either a value or an error,
-    plus metadata for ordering, retries, and diagnostics.
+    A Result with a batch index holding either a value or an error.
     """
 
     index: int
@@ -18,8 +22,11 @@ class Result(Generic[OutputType]):
     value: OutputType | None = None
     """Computed values returned by [`do()`][task.Task.do]."""
 
-    error: Exception | None = None
-    """Errors that are captured during [`do()`][task.Task.do]."""
 
-    metadata: dict[str, object] = field(default_factory=dict)
-    """Future-proofing metadata."""
+@dataclass
+class MeanResult(Result[OutputType]):
+    count: int
+    """Number of values used in this mean"""
+
+    value: OutputType | None
+    """Element-wise mean"""

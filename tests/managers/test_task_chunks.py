@@ -1,21 +1,22 @@
-from typing import Any
+from typing import override
 
 import pytest
 
-from raygent import ResultsHandler, Task, TaskManager
+from raygent import ResultsCollector, Task, TaskManager
 
 
 class DummyTask(Task[list[float], list[float]]):
     """A dummy task that doubles the input."""
 
-    def do(self, batch: list[float], **kwargs: dict[str, Any]) -> list[float]:
+    @override
+    def do(self, batch: list[float], *args: object, **kwargs: object) -> list[float]:
         return [item * 2 for item in batch]
 
 
 @pytest.fixture
 def dummy_task_manager():
     # For testing, use DummyTask and sequential mode (use_ray=False).
-    result_handler = ResultsHandler()
+    result_handler = ResultsCollector[list[float]]()
     manager = TaskManager(
         task_cls=DummyTask, result_handler=result_handler, use_ray=False
     )

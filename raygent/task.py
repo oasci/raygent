@@ -3,7 +3,7 @@ from typing import Generic
 from abc import ABC, abstractmethod
 
 from raygent.dtypes import BatchType, OutputType
-from raygent.results import Result
+from raygent.results import IndexedResult, Result
 
 
 class Task(ABC, Generic[BatchType, OutputType]):
@@ -133,11 +133,9 @@ class Task(ABC, Generic[BatchType, OutputType]):
             ```
         """
         self.setup(**kwargs)
-        result: Result[OutputType] = Result[OutputType](index=index)
+        result = IndexedResult[OutputType](index=index)
         output: OutputType | Exception = self.do(batch, *args, **kwargs)
-        if isinstance(output, Exception):
-            result.error = output
-        else:
+        if not isinstance(output, Exception):
             result.value = output
 
         self.teardown(**kwargs)

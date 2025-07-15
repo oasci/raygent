@@ -1,9 +1,3 @@
-from .result import Result
-from .handler import ResultsHandler
-from .mean import OnlineMeanResults
+from .result import Result, IndexedResult, MeanResult
 
-__all__ = [
-    "Result",
-    "ResultsHandler",
-    "OnlineMeanResults",
-]
+__all__ = ["Result", "IndexedResult", "MeanResult"]

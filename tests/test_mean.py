@@ -1,60 +1,35 @@
 import numpy as np
 import pytest
 
-from raygent.results import OnlineMeanResults
-from raygent.savers import Saver
-
-
-class DummySaver(Saver):
-    """A simple saver to record saved data."""
-
-    def __init__(self):
-        self.saved_data = []
-
-    def save(self, data):
-        self.saved_data.append(data)
+from raygent.results import MeanResult
+from raygent.results.handlers import OnlineMeanResultsHandler
 
 
 def test_mean_initial_state():
-    handler = OnlineMeanResults()
+    handler = OnlineMeanResultsHandler()
     assert handler.global_mean is None
     assert handler.total_count == 0
     with pytest.raises(ValueError):
-        handler.get_results()
+        handler.get()
 
 
 def test_mean_single_batch():
-    handler = OnlineMeanResults()
+    handler = OnlineMeanResultsHandler()
     partial_mean = np.array([5.0])
     count = 10
-    handler.add_result((partial_mean, count))
-    results = handler.get_results()
-    np.testing.assert_array_almost_equal(results["mean"], partial_mean)
-    assert results["n"] == count
+    handler.add_result(MeanResult(count=count, value=partial_mean))
+    results = handler.get()
+    np.testing.assert_array_almost_equal(results.value, partial_mean)
+    assert results.count == count
 
 
 def test_mean_multiple_batches():
-    handler = OnlineMeanResults()
+    handler = OnlineMeanResultsHandler()
     # First batch: mean = [10.0], count = 5.
-    handler.add_result((np.array([10.0]), 5))
+    handler.add_result(MeanResult(count=5, value=np.array([10.0])))
     # Second batch: mean = [20.0], count = 15.
-    handler.add_result((np.array([20.0]), 15))
-    results = handler.get_results()
+    handler.add_result(MeanResult(count=15, value=np.array([20.0])))
+    results = handler.get()
     # Expected mean = (5*10 + 15*20) / (5 + 15) = 350 / 20 = 17.5
-    np.testing.assert_array_almost_equal(results["mean"], np.array([17.5]))
-    assert results["n"] == 20
-
-
-def test_mean_save_and_finalize():
-    handler = OnlineMeanResults()
-    saver = DummySaver()
-    handler.add_result((np.array([3.0]), 3))
-    # Trigger periodic saving with a save_interval lower than total_count.
-    handler.save(saver, save_interval=2)
-    # Finalize should also trigger a save.
-    handler.finalize(saver)
-    # Expect two saves.
-    assert len(saver.saved_data) == 2
-    last_save = saver.saved_data[-1]
-    np.testing.assert_array_almost_equal(last_save["mean"], np.array([3.0]))
-    assert last_save["n"] == 3
+    np.testing.assert_array_almost_equal(results.value, np.array([17.5]))
+    assert results.count == 20

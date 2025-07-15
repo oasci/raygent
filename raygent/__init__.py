@@ -1,7 +1,5 @@
 """Parallelism, Delegated"""
 
-from typing import Any
-
 import os
 import sys
 from ast import literal_eval
@@ -10,9 +8,10 @@ from loguru import logger
 
 from .manager import TaskManager
 from .task import Task
-from .results import Result, ResultsHandler
+from .results import Result
+from .results.handlers import ResultsCollector
 
-__all__ = ["TaskManager", "Task", "Result", "ResultsHandler"]
+__all__ = ["TaskManager", "Task", "Result", "ResultsCollector"]
 
 logger.disable("raygent")
 
@@ -35,7 +34,7 @@ def enable_logging(
         level: Requested log level: `10` is debug, `20` is info.
         file_path: Also write logs to files here.
     """
-    config: dict[str, Any] = {"handlers": []}
+    config: dict[str, list[dict[str, object]]] = {"handlers": []}
     if stdout_set:
         config["handlers"].append(
             {

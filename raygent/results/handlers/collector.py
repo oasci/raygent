@@ -1,4 +1,4 @@
-from typing import Generic
+from typing import Generic, override
 
 from bisect import bisect_right
 from collections.abc import MutableSequence
@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from loguru import logger
 
 from raygent.dtypes import OutputType
-from raygent.results import Result
+from raygent.results import IndexedResult
+from raygent.results.handlers import ResultsHandler
 from raygent.savers import Saver
 
 
@@ -17,7 +18,7 @@ class ResultsBuffer(Generic[OutputType]):
     results: MutableSequence[OutputType]
 
 
-class ResultsHandler(Generic[OutputType]):
+class ResultsCollector(ResultsHandler[OutputType]):
     """
     Handler that accumulates `Result[OutputType]` instances and supports
     periodic flush/save and final aggregation.
@@ -35,12 +36,12 @@ class ResultsHandler(Generic[OutputType]):
         """
         self.n_results: int = 0
         self.buffer: ResultsBuffer[OutputType] = ResultsBuffer(indices=[], results=[])
-        self.saver: Saver[OutputType] | None = saver
-        self.save_interval: int = save_interval
+        super().__init__(saver, save_interval)
 
+    @override
     def add_result(
         self,
-        result: Result[OutputType],
+        result: IndexedResult[OutputType],
         *args: object,
         **kwargs: object,
     ) -> None:
@@ -76,6 +77,7 @@ class ResultsHandler(Generic[OutputType]):
         self.buffer = ResultsBuffer(indices=[], results=[])
         self.n_results = 0
 
+    @override
     def save(self) -> None:
         """
         Persists a slice of the currently collected results if a saving interval
@@ -92,9 +94,11 @@ class ResultsHandler(Generic[OutputType]):
         if self.n_results >= self.save_interval:
             self._save()
 
+    @override
     def finalize(self) -> None:
         self._save()
 
+    @override
     def get(self) -> MutableSequence[OutputType]:
         results: MutableSequence[OutputType] = self.buffer.results
         return results

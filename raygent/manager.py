@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Generic
 
-from collections.abc import Generator, Iterable, Mapping
+from collections.abc import Generator, Mapping, Sequence
 from itertools import islice
 
 try:
@@ -13,8 +13,9 @@ except ImportError:
     has_ray = False
 from loguru import logger
 
-from raygent.dtypes import BatchType, DatumType, OutputType
-from raygent.results import Result, ResultsHandler
+from raygent.dtypes import BatchType, OutputType
+from raygent.results import Result
+from raygent.results.handlers import ResultsCollector, ResultsHandler
 from raygent.savers import Saver
 
 if TYPE_CHECKING:
@@ -41,7 +42,7 @@ class TaskManager(Generic[BatchType, OutputType]):
             result_handler: Class that collects, processes, and handles all
                 [`Result`][results.result.Result]s after calling
                 [`run_batch`][task.Task.run_batch] on `task`. Defaults to
-                [`ResultsHandler`][results.handler.ResultsHandler].
+                [`ResultsCollector`][results.handlers.collector.ResultsCollector].
             n_cores: Number of parallel tasks to run. If <= 0, uses all available CPUs.
                 Default is to use all available cores (i.e., `-1`).
             use_ray: Flag to determine if Ray should be used for parallel execution.
@@ -59,13 +60,13 @@ class TaskManager(Generic[BatchType, OutputType]):
         """
 
         if result_handler is None:
-            result_handler = ResultsHandler()
+            result_handler = ResultsCollector()
         self.result_handler: ResultsHandler[OutputType] = result_handler
         """
         Class that collects, processes, and handles all
         [`Result`][results.result.Result]s after calling
         [`run_batch`][task.Task.run_batch] on `task`. Defaults to
-        [`ResultsHandler`][results.handler.ResultsHandler].
+        [`ResultsCollector`][results.handlers.collector.ResultsCollector].
         """
 
         assert isinstance(use_ray, bool), "use_ray must be a bool"
@@ -82,10 +83,10 @@ class TaskManager(Generic[BatchType, OutputType]):
         Example:
             ```python
             # Sequential processing
-            manager = TaskManager(MyTask, ResultsHandler(), use_ray=False)
+            manager = TaskManager(MyTask, ResultsCollector(), use_ray=False)
 
             # Parallel processing
-            manager = TaskManager(MyTask, ResultsHandler(), use_ray=True)
+            manager = TaskManager(MyTask, ResultsCollector(), use_ray=True)
             ```
         """
 
@@ -248,7 +249,7 @@ class TaskManager(Generic[BatchType, OutputType]):
         data: BatchType,
         batch_size: int = 10,
         prebatched: bool = False,
-        saver: Saver | None = None,
+        saver: Saver[OutputType] | None = None,
         save_interval: int = 10,
         args_task: tuple[object] | None = None,
         kwargs_task: Mapping[str, object] | None = None,
@@ -492,7 +493,7 @@ class TaskManager(Generic[BatchType, OutputType]):
         """
         return self.result_handler
 
-    def get_results(self) -> list[OutputType]:
+    def get_results(self) -> Sequence[OutputType] | object:
         """Retrieves all collected results from completed tasks.
 
         This method provides access to the accumulated results that have been
