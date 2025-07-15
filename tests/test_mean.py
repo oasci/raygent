@@ -23,7 +23,7 @@ def test_mean_initial_state():
         handler.get_results()
 
 
-def test_mean_single_chunk():
+def test_mean_single_batch():
     handler = OnlineMeanResults()
     partial_mean = np.array([5.0])
     count = 10
@@ -33,11 +33,11 @@ def test_mean_single_chunk():
     assert results["n"] == count
 
 
-def test_mean_multiple_chunks():
+def test_mean_multiple_batches():
     handler = OnlineMeanResults()
-    # First chunk: mean = [10.0], count = 5.
+    # First batch: mean = [10.0], count = 5.
     handler.add_result((np.array([10.0]), 5))
-    # Second chunk: mean = [20.0], count = 15.
+    # Second batch: mean = [20.0], count = 15.
     handler.add_result((np.array([20.0]), 15))
     results = handler.get_results()
     # Expected mean = (5*10 + 15*20) / (5 + 15) = 350 / 20 = 17.5

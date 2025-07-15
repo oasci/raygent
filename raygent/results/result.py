@@ -1,8 +1,8 @@
-from typing import Any, Generic, TypeVar
+from typing import Generic
 
 from dataclasses import dataclass, field
 
-OutputType = TypeVar("OutputType")
+from raygent.dtypes import OutputType
 
 
 @dataclass
@@ -13,7 +13,7 @@ class Result(Generic[OutputType]):
     """
 
     index: int
-    """Index to specify the order of chunks."""
+    """Index to specify the order of batches."""
 
     value: OutputType | None = None
     """Computed values returned by [`do()`][task.Task.do]."""
@@ -21,5 +21,5 @@ class Result(Generic[OutputType]):
     error: Exception | None = None
     """Errors that are captured during [`do()`][task.Task.do]."""
 
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, object] = field(default_factory=dict)
     """Future-proofing metadata."""

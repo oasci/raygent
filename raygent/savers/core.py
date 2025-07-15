@@ -1,9 +1,11 @@
-from typing import Any
+from typing import Any, Generic
 
 from abc import ABC, abstractmethod
 
+from raygent.dtypes import OutputType
 
-class Saver(ABC):
+
+class Saver(ABC, Generic[OutputType]):
     """Abstract base class for saving data in various formats or destinations.
 
     The Saver class provides a standardized interface for persisting computational
@@ -22,11 +24,11 @@ class Saver(ABC):
 
         ```python
         # Create a TaskManager with a Saver
-        task_manager = TaskManager(MyTask(), use_ray=True)
+        task_manager = TaskManager(MyTask, use_ray=True)
         saver = HDF5Saver("results.h5", dataset_name="experiment_1")
 
         # Submit tasks with periodic saving
-        task_manager.submit_tasks(items, saver=saver, save_interval=100)
+        task_manager.submit_tasks(batch, saver=saver, save_interval=100)
         ```
 
         Creating a custom Saver:
@@ -59,7 +61,7 @@ class Saver(ABC):
     @abstractmethod
     def save(
         self,
-        data: list[Any] | dict[str, Any],
+        data: OutputType,
         indices: Any | None = None,
         **kwargs: dict[str, Any],
     ) -> None:

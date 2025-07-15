@@ -1,28 +1,26 @@
-from typing import TYPE_CHECKING, Any, TypeVar
-
-from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
 import ray
 
 if TYPE_CHECKING:
-    from raygent import Task
+    from raygent import Result, Task
 
-InputType = TypeVar("InputType")
-OutputType = TypeVar("OutputType")
+from raygent.dtypes import BatchType, OutputType
 
 
 @ray.remote
 def ray_worker(
-    task: "Task[InputType, OutputType]",
+    task_cls: "type[Task[BatchType, OutputType]]",
     index: int,
-    chunk: InputType | Iterable[InputType],
-    **kwargs: dict[str, Any],
-) -> OutputType:
+    batch: BatchType,
+    *args: object,
+    **kwargs: object,
+) -> "Result[OutputType]":
     """
     Remote Ray worker function that processes tasks in parallel.
 
     This function is a wrapper around a [`Task`][task.Task] object that executes
-    the task's [`run_chunk`][task.Task.run_chunk] method with the provided chunk
+    the task's [`run_batch`][task.Task.run_batch] method with the provided batch
     of data. It serves as the core execution unit when using Ray.
 
     While primarily used internally by [`TaskManager`][manager.TaskManager]'s
@@ -30,28 +28,26 @@ def ray_worker(
     called directly for custom Ray deployments if needed.
 
     Args:
-        task: A callable that returns a [`Task`][task.Task] instance with
-            [`run_chunk`][task.Task.run_chunk] and [`process_item`][task.Task.process_item]
-            or [`do`][task.Task.do] methods.
-        index: Chunk index used for [`Result.index`][results.result.Result.index].
-        chunk: `InputType` to be processed by the task.
+        task_cls: A class that is type [`Task`][task.Task].
+        index: Batch index used for [`Result.index`][results.result.Result.index].
+        batch: `InputType` to be processed by the task.
         *args: Additional positional arguments passed to the task's
-            [`run_chunk`][task.Task.run_chunk] method.
+            [`run_batch`][task.Task.run_batch] method.
         **kwargs: Additional keyword arguments passed to the task's
-            [`run_chunk`][task.Task.run_chunk] method. These can include task-specific parameters
+            [`run_batch`][task.Task.run_batch] method. These can include task-specific parameters
             that customize execution.
 
     Returns:
-        The results from executing the task's run_chunk method on the provided chunk.
-            Typically this is a list of processed items or results.
+        The results from executing the task's run_batch method on the provided batch.
+            Typically this is a list of processed batch or results.
 
     Examples:
         Basic usage through [`TaskManager`][manager.TaskManager] (recommended):
 
         ```python
         # This is handled automatically by TaskManager when use_ray=True
-        manager = TaskManager(MyTask(), use_ray=True)
-        manager.submit_tasks(items)
+        manager = TaskManager(MyTask, use_ray=True)
+        manager.submit_tasks(batch)
         ```
 
         Direct usage (advanced):
@@ -63,7 +59,7 @@ def ray_worker(
 
         # Create a remote worker with 2 CPUs
         future = ray_worker.options(num_cpus=2).remote(
-            MyTask, index, chunk, custom_param="value"
+            MyTask, index, batch, custom_param="value"
         )
 
         # Get results
@@ -79,7 +75,7 @@ def ray_worker(
         ).remote(
             ComplexTask,
             index,
-            large_chunk,
+            large_batch,
             preprocessing_steps=["normalize", "filter"],
             batch_size=64,
         )
@@ -92,4 +88,5 @@ def ray_worker(
         This function is decorated with `@ray.remote`, making it a Ray remote function
         that can be executed on any worker in the Ray cluster.
     """
-    return task.run_chunk(index, chunk, **kwargs)
+    task: "Task[BatchType, OutputType]" = task_cls()
+    return task.run_batch(index, batch, *args, **kwargs)

@@ -7,7 +7,7 @@ Some key features include:
 
 -   **Flexible Execution Modes**: Runs tasks either sequentially or in parallel using Ray.
 -   **Dynamic Resource Allocation**: Automatically detects available CPU cores unless specified.
--   **Task Chunking**: Supports processing data in configurable chunk sizes for optimized parallelism.
+-   **Task Batching**: Supports processing data in configurable batch sizes for optimized parallelism.
 -   **Asynchronous Execution with Ray**: Manages Ray object references (`futures`) for efficient workload distribution.
 -   **Custom Save Function Support**: Allows intermediate results to be saved at specified intervals.
 
@@ -19,15 +19,15 @@ The [`TaskManager`][manager.TaskManager] constructor initializes the execution e
 from raygent import TaskManager
 from my_tasks import ExampleTask
 
-manager = TaskManager(ExampleTask(), n_cores=4, use_ray=True)
+manager = TaskManager(ExampleTask, n_cores=4, use_ray=True)
 ```
 
 ## Submitting Tasks
 
-Tasks are submitted using [`submit_tasks`][manager.TaskManager.submit_tasks], which divides data into chunks and manages workers efficiently.
+Tasks are submitted using [`submit_tasks`][manager.TaskManager.submit_tasks], which divides data into batches and manages workers efficiently.
 
 ```python
-manager.submit_tasks(items=[1, 2, 3, 4, 5], chunk_size=2)
+manager.submit_tasks(batch=[1, 2, 3, 4, 5], batch_size=2)
 ```
 
 ## Retrieving Results

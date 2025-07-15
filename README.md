@@ -29,7 +29,7 @@ It removes boilerplate code and offers a modular approach to managing parallel t
 -   **Simple Task-Based API**: Define your computational logic once and automatically scale across cores.
 -   **Flexible Execution Modes**: Run tasks either in parallel using Ray or sequentially with a single parameter.
 -   **Resource Optimization**: Automatically detect available CPU cores and manage resource allocation.
--   **Chunked Processing**: Efficiently process data in optimal batch sizes.
+-   **Batched Processing**: Efficiently process data in optimal batch sizes.
 -   **Intermediate Result Saving**: Save results at customizable intervals with pluggable savers.
 -   **Error Handling**: Built-in error capture and logging.
 
@@ -40,14 +40,14 @@ from raygent import Task, TaskManager
 
 # Define your task
 class SquareTask(Task[list[float], list[float]]):
-    def do(self, items):
-        return [item ** 2 for item in items]
+    def do(self, batch):
+        return [item ** 2 for item in batch]
 
 # Create a task manager
-manager = TaskManager(SquareTask(), use_ray=True)
+manager = TaskManager(SquareTask, use_ray=True)
 
 # Process items in parallel
-manager.submit_tasks(items=[1., 2., 3., 4., 5.])
+manager.submit_tasks(batch=[1., 2., 3., 4., 5.])
 results = manager.get_results()
 print(results.value)  # [1., 4., 9., 16., 25.]
 ```

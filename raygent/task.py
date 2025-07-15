@@ -1,22 +1,21 @@
-from typing import Any, Protocol, TypeVar
+from typing import Generic
 
+from abc import ABC, abstractmethod
+
+from raygent.dtypes import BatchType, OutputType
 from raygent.results import Result
 
-InputType = TypeVar(name="InputType", contravariant=True)
-OutputType = TypeVar(name="OutputType")
 
-
-class Task(Protocol[InputType, OutputType]):
+class Task(ABC, Generic[BatchType, OutputType]):
     """Protocol for executing computational tasks on collections of data.
 
     The `Task` class provides a flexible framework for processing data items and
     serves as the core computational unit in the `raygent` framework.
 
     This class implements the Template Method pattern, where the base class (`Task`)
-    defines the protocol of an algorithm in its [`run_chunk`][task.Task.run_chunk] method,
+    defines the protocol of an algorithm in its [`run_batch`][task.Task.run_batch] method,
     while deferring some steps to subclasses through the
     [`do`][task.Task.do] method.
-
 
     **Types**
 
@@ -24,7 +23,7 @@ class Task(Protocol[InputType, OutputType]):
     `InputType` and `OutputType` will be. These types specify what data that
     [`do`][task.Task.do] will receive in `items` and
     expected to return.
-    Note that [`items`][task.Task.do] assumes a chunk of multiple values
+    Note that [`items`][task.Task.do] assumes a batch of multiple values
     will be provided. If your task is to square numbers, then you would provide
     something like:
 
@@ -48,7 +47,7 @@ class Task(Protocol[InputType, OutputType]):
     **Implementation**
 
     The only required implementation is [`do`][task.Task.do]
-    which specifies how to process a chunk of items. For example, writing a
+    which specifies how to process a batch of items. For example, writing a
     [`Task`][task.Task] that computes the mean value across rows of a
     NumPy array could be implemented like so.
 
@@ -58,7 +57,7 @@ class Task(Protocol[InputType, OutputType]):
     import numpy.typing as npt
 
     class MeanTask(Task[npt.NDArray[np.float64], npt.NDArray[np.float64]):
-        def do(self, items: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+        def do(self, batch: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
             mean = np.mean(items, axis=1)
             return mean
     ```
@@ -73,7 +72,7 @@ class Task(Protocol[InputType, OutputType]):
     ```
 
     !!! note
-        [`TaskManager`][manager.TaskManager] calls [`run_chunk()`][task.Task.run_chunk] to
+        [`TaskManager`][manager.TaskManager] calls [`run_batch()`][task.Task.run_batch] to
         produce a [`Result`][results.Result] to handle any setup, teardown, and
         errors.
 
@@ -82,7 +81,7 @@ class Task(Protocol[InputType, OutputType]):
 
         ```python
         index = 0
-        result = task.run_chunk(index, arr)
+        result = task.run_batch(index, arr)
         result.value  # Returns: np.array([2., 5.])
         ```
 
@@ -91,25 +90,26 @@ class Task(Protocol[InputType, OutputType]):
     def __init__(self) -> None:
         super().__init__()
 
-    def setup(self, **kwargs: dict[str, Any]) -> None:
+    def setup(self, *args: object, **kwargs: object) -> None:
         """Optional setup method called once before processing begins."""
 
-    def teardown(self, **kwargs: dict[str, Any]) -> None:
+    def teardown(self, *args: object, **kwargs: object) -> None:
         """Optional teardown method called once after all processing is complete."""
 
-    def run_chunk(
+    def run_batch(
         self,
         index: int,
-        items: InputType,
-        **kwargs: dict[str, Any],
+        batch: BatchType,
+        *args: object,
+        **kwargs: object,
     ) -> Result[OutputType]:
         """This method serves as the primary entry point for task execution.
 
         Args:
             index: A unique integer used to specify ordering for
                 [`Result.index`][results.Result.index].
-            items: Data to process using [`do`][task.Task.do].
-            *args: Addutional positional arguments pass to
+            batch: Data to process using [`do`][task.Task.do].
+            *args: Additional positional arguments pass to
                 [`startup`][task.Task.startup],
                 [`do`][task.Task.do], and
                 [`teardown`][task.Task.teardown].
@@ -129,12 +129,12 @@ class Task(Protocol[InputType, OutputType]):
 
 
             task = NumberSquarerTask()
-            result = task.run_chunk(0, [1.0, 2.0, 3.0, 4.0, 5.0])
+            result = task.run_batch(0, [1.0, 2.0, 3.0, 4.0, 5.0])
             ```
         """
         self.setup(**kwargs)
         result: Result[OutputType] = Result[OutputType](index=index)
-        output: OutputType | Exception = self.do(items, **kwargs)
+        output: OutputType | Exception = self.do(batch, *args, **kwargs)
         if isinstance(output, Exception):
             result.error = output
         else:
@@ -143,20 +143,22 @@ class Task(Protocol[InputType, OutputType]):
         self.teardown(**kwargs)
         return result
 
+    @abstractmethod
     def do(
         self,
-        items: InputType,
-        **kwargs: dict[str, Any],
+        batch: BatchType,
+        *args: object,
+        **kwargs: object,
     ) -> OutputType | Exception:
         """Processes multiple items at once in a batch operation.
 
         This method defines the computation logic for batch processing a collection
-        of items together. It is called by the [`run_chunk`][task.Task.run_chunk].
+        of items together. It is called by the [`run_batch`][task.Task.run_batch].
 
         Args:
-            items: Data to be processed together.
+            batch: Data to be processed together.
             **kwargs: Additional keyword arguments that customize processing behavior.
-                These arguments are passed directly from the `run_chunk` method.
+                These arguments are passed directly from the `run_batch` method.
 
         Returns:
             The processed results for all items, typically a list matching the input
@@ -183,4 +185,3 @@ class Task(Protocol[InputType, OutputType]):
                     ]
             ```
         """
-        raise NotImplementedError

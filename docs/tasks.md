@@ -3,7 +3,7 @@
 A **task** in `raygent` represents a unit of computation that processes a batch of items using a user-defined class that extends [`Task`][task.Task].
 Each task operates on a subset of input data and executes computations in parallel when using Ray, or sequentially if Ray is disabled.
 
-The execution of a task follows a structured workflow, where the [`run_chunk`][task.Task.run_chunk] method orchestrates the computation by applying [`do`][task.Task.do] to each item in the batch.
+The execution of a task follows a structured workflow, where the [`run_batch`][task.Task.run_batch] method orchestrates the computation by applying [`do`][task.Task.do] to each item in the batch.
 This enables efficient parallelization while ensuring error handling and logging.
 By defining a structured pipeline for task execution, users can efficiently scale computations across multiple cores or nodes, depending on their system capabilities and needs.
 
@@ -21,7 +21,7 @@ from raygent import Task
 
 
 class MeanTask(Task[npt.NDArray[np.float64], np.float64]):
-    def do(self, items: npt.NDArray[np.float64]) -> np.float64:
+    def do(self, batch: npt.NDArray[np.float64]) -> np.float64:
         return np.mean(items)
 
 task = MeanTask()
@@ -31,6 +31,6 @@ print(task.do(data))  # Output: 5.0
 
 Using [do][task.Task.do] ensures optimized performance for numerical computations, making this approach well-suited for tasks involving large-scale data processing.
 
-## `run_chunk`
+## `run_batch`
 
-The `run_chunk` method is responsible for processing multiple items at once.
+The `run_batch` method is responsible for processing multiple items at once.

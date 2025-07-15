@@ -1,33 +1,36 @@
-from typing import Any, TypeVar
+from typing import override
 
-from collections.abc import Iterable
+from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
 
-from raygent.results import ResultHandler
-from raygent.savers import Saver
-
-OutputType = TypeVar("OutputType")
+from raygent.results import Result, ResultsHandler
 
 
-class OnlineMeanResults(ResultHandler[OutputType]):
+@dataclass
+class MeanResults:
+    mean: npt.NDArray[np.float64]
+    count: int
+
+
+class OnlineMeanResults(ResultsHandler[MeanResults]):
     r"""
     `OnlineMeanResults` provides a numerically stable, online (incremental)
     algorithm to compute the arithmetic mean of large, streaming, or distributed
     datasets represented as NumPy arrays. In many real-world applications—such a
     distributed computing or real-time data processing—data is processed
-    in chunks, with each chunk yielding a partial mean and its corresponding count.
+    in batches, with each batch yielding a partial mean and its corresponding count.
     This class merges these partial results into a global mean without needing to
     store all the raw data, thus avoiding issues such as numerical overflow and
     precision loss.
 
-    Suppose the overall dataset is divided into k chunks.
-    For each chunk $i$ (where $1 \leq i \leq k$), let:
+    Suppose the overall dataset is divided into k batches.
+    For each batch $i$ (where $1 \leq i \leq k$), let:
 
       - $m_i$ be the partial mean computed over $n_i$ data points.
-      - $M_i$ be the global mean computed after processing $i$ chunks.
-      - $N_i = n_1 + n_2 + ... + n_i$ be the cumulative count after $i$ chunks.
+      - $M_i$ be the global mean computed after processing $i$ batches.
+      - $N_i = n_1 + n_2 + ... + n_i$ be the cumulative count after $i$ batches.
 
     The arithmetic mean of all data points is defined as:
 
@@ -55,7 +58,7 @@ class OnlineMeanResults(ResultHandler[OutputType]):
     difference `(m_partial - M_old)` and scaling it by the relative weight
     `n_partial / (n_old + n_partial)`, the algorithm minimizes the round-off
     errors that can occur when summing large numbers or when processing many
-    chunks sequentially.
+    batches sequentially.
     """
 
     def __init__(self) -> None:
@@ -74,69 +77,38 @@ class OnlineMeanResults(ResultHandler[OutputType]):
         """
         The total number of observations processed.
         """
+        super().__init__()
 
+    @override
     def add_result(
         self,
-        chunk_results: OutputType | Iterable[OutputType],
-        chunk_index: int | None = None,
-        *args: tuple[Any],
-        **kwargs: dict[str, Any],
+        result: Result[MeanResults],
+        *args: object,
+        **kwargs: object,
     ) -> None:
         """
-        Processes one or more chunks of partial results to update the global mean.
+        Processes one or more batches of partial results to update the global mean.
 
         Args:
-            chunk_results: Results after running Task.
-            chunk_index: An optional index identifier for the chunk
+            batch_results: Results after running Task.
+            batch_index: An optional index identifier for the batch
                 (for interface consistency, not used in calculations).
         """
-        if isinstance(chunk_results, tuple):
-            chunk_results = [chunk_results]
+        mean_result = result.value
+        if mean_result is None:
+            return
+        if self.global_mean is None:
+            self.global_mean = np.array(mean_result.mean, dtype=np.float64)
+            self.total_count = mean_result.count
+        else:
+            new_total = self.total_count + mean_result.count
+            self.global_mean = self.global_mean + (
+                mean_result.mean - self.global_mean
+            ) * (mean_result.count / new_total)
+            self.total_count = new_total
 
-        for partial_mean, count in chunk_results:
-            if self.global_mean is None:
-                self.global_mean = np.array(partial_mean, dtype=np.float64)
-                self.total_count = count
-            else:
-                new_total = self.total_count + count
-                self.global_mean = self.global_mean + (
-                    partial_mean - self.global_mean
-                ) * (count / new_total)
-                self.total_count = new_total
-
-    def save(self, saver: Saver | None, save_interval: int) -> None:
-        """
-        Persists the current global mean at periodic intervals if a saver is provided.
-
-        This method is useful in long-running or distributed applications where saving
-        intermediate results is necessary for fault tolerance. It checks if the total
-        number of observations processed meets or exceeds the `save_interval` and,
-        if so, invokes the save method of the provided saver.
-
-        Args:
-            saver: An instance of a Saver, which has a save method to persist data,
-                or None.
-            save_interval: The threshold for the total number of observations to
-                trigger a save.
-        """
-        if saver and self.total_count >= save_interval and self.global_mean is not None:
-            saver.save({"mean": self.global_mean, "n": self.total_count})
-
-    def finalize(self, saver: Saver | None) -> None:
-        """
-        Finalizes the accumulation process and persists the final global mean
-        if a saver is provided.
-
-        This method should be called when no more data is expected. It ensures
-        that the final computed mean and the total observation count are saved.
-
-        Args:
-            saver: An instance of a Saver to save the final result, or None.
-        """
-        if saver and self.global_mean is not None:
-            saver.save({"mean": self.global_mean, "n": self.total_count})
-
-    def get_results(self) -> dict[str, npt.NDArray[np.float64] | int]:
+    @override
+    def get(self) -> MeanResults:
         """
         Retrieves the final computed global mean along with the total number of
         observations.
@@ -154,4 +126,4 @@ class OnlineMeanResults(ResultHandler[OutputType]):
         """
         if self.global_mean is None or self.total_count == 0:
             raise ValueError("No data has been processed.")
-        return {"mean": self.global_mean, "n": self.total_count}
+        return MeanResults(mean=self.global_mean, count=self.total_count)

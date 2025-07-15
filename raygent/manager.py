@@ -1,7 +1,7 @@
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic
 
-from collections.abc import Generator
-from inspect import isgenerator
+from collections.abc import Generator, Iterable, Mapping
+from itertools import islice
 
 try:
     import ray
@@ -13,17 +13,15 @@ except ImportError:
     has_ray = False
 from loguru import logger
 
-from raygent.results import Result, ResultHandler
+from raygent.dtypes import BatchType, DatumType, OutputType
+from raygent.results import Result, ResultsHandler
 from raygent.savers import Saver
 
 if TYPE_CHECKING:
     from raygent import Task
 
-InputType = TypeVar("InputType")
-OutputType = TypeVar("OutputType")
 
-
-class TaskManager(Generic[InputType, OutputType]):
+class TaskManager(Generic[BatchType, OutputType]):
     """
     A manager class for handling task submissions and result collection using serial
     computations or Ray's Parallelism.
@@ -31,20 +29,19 @@ class TaskManager(Generic[InputType, OutputType]):
 
     def __init__(
         self,
-        task: "Task[InputType, OutputType]",
-        result_handler: ResultHandler[OutputType] | None = None,
+        task_cls: "type[Task[BatchType, OutputType]]",
+        result_handler: ResultsHandler[OutputType] | None = None,
         n_cores: int = -1,
         use_ray: bool = False,
         n_cores_worker: int = 1,
     ) -> None:
         """
         Args:
-            task: A callable that returns an instance with a `run_chunk` method for
-                processing each item.
+            task_cls: A class that is type [`Task`][task.Task].
             result_handler: Class that collects, processes, and handles all
                 [`Result`][results.result.Result]s after calling
-                [`run_chunk`][task.Task.run_chunk] on `task`. Defaults to
-                [`ResultHandler`][results.handler.ResultHandler].
+                [`run_batch`][task.Task.run_batch] on `task`. Defaults to
+                [`ResultsHandler`][results.handler.ResultsHandler].
             n_cores: Number of parallel tasks to run. If <= 0, uses all available CPUs.
                 Default is to use all available cores (i.e., `-1`).
             use_ray: Flag to determine if Ray should be used for parallel execution.
@@ -52,23 +49,23 @@ class TaskManager(Generic[InputType, OutputType]):
             n_cores_worker: The number of cores allocated for each worker.
         """
 
-        self.task: Task[InputType, OutputType] = task
+        self.task_cls: type[Task[BatchType, OutputType]] = task_cls
         """
         A class instance that follows the [`Task`][task.Task] protocol.
 
         This callable must return an object that implements the [`Task`][task.Task]
-        interface, with [`do`][task.Task.do] and [`run_chunk`][task.Task.run_chunk]
+        interface, with [`do`][task.Task.do] and [`run_batch`][task.Task.run_batch]
         methods.
         """
 
         if result_handler is None:
-            result_handler = ResultHandler()
-        self.result_handler: ResultHandler[OutputType] = result_handler
+            result_handler = ResultsHandler()
+        self.result_handler: ResultsHandler[OutputType] = result_handler
         """
         Class that collects, processes, and handles all
         [`Result`][results.result.Result]s after calling
-        [`run_chunk`][task.Task.run_chunk] on `task`. Defaults to
-        [`ResultHandler`][results.handler.ResultHandler].
+        [`run_batch`][task.Task.run_batch] on `task`. Defaults to
+        [`ResultsHandler`][results.handler.ResultsHandler].
         """
 
         assert isinstance(use_ray, bool), "use_ray must be a bool"
@@ -85,10 +82,10 @@ class TaskManager(Generic[InputType, OutputType]):
         Example:
             ```python
             # Sequential processing
-            manager = TaskManager(MyTask(), ResultHandler(), use_ray=False)
+            manager = TaskManager(MyTask, ResultsHandler(), use_ray=False)
 
             # Parallel processing
-            manager = TaskManager(MyTask(), ResultHandler(), use_ray=True)
+            manager = TaskManager(MyTask, ResultsHandler(), use_ray=True)
             ```
         """
 
@@ -110,10 +107,10 @@ class TaskManager(Generic[InputType, OutputType]):
         Example:
             ```python
             # Use all available cores
-            manager = TaskManager(MyTask(), use_ray=True, n_cores=-1)
+            manager = TaskManager(MyTask, use_ray=True, n_cores=-1)
 
             # Use up to 4 cores
-            manager = TaskManager(MyTask(), use_ray=True, n_cores=4)
+            manager = TaskManager(MyTask, use_ray=True, n_cores=4)
             ```
         """
 
@@ -134,13 +131,13 @@ class TaskManager(Generic[InputType, OutputType]):
         Example:
             ```python
             # Each task gets 1 core (maximum task parallelism)
-            manager = TaskManager(SimpleTask(), use_ray=True, n_cores_worker=1)
+            manager = TaskManager(SimpleTask, use_ray=True, n_cores_worker=1)
 
             # Each task gets 2 cores (good for moderately parallel tasks)
-            manager = TaskManager(ComputeTask(), use_ray=True, n_cores_worker=2)
+            manager = TaskManager(ComputeTask, use_ray=True, n_cores_worker=2)
 
             # Each task gets 4 cores (for tasks with internal parallelism)
-            manager = TaskManager(ParallelTask(), use_ray=True, n_cores_worker=4)
+            manager = TaskManager(ParallelTask, use_ray=True, n_cores_worker=4)
             ```
         """
 
@@ -186,16 +183,16 @@ class TaskManager(Generic[InputType, OutputType]):
         Examples:
             ```python
             # With 8 total cores and 2 cores per worker
-            manager = TaskManager(MyTask(), n_cores=8, n_cores_worker=2, use_ray=True)
+            manager = TaskManager(MyTask, n_cores=8, n_cores_worker=2, use_ray=True)
             print(manager.max_concurrent_tasks)  # Output: 4
 
             # With 16 total cores and 4 cores per worker
-            manager = TaskManager(MyTask(), n_cores=16, n_cores_worker=4, use_ray=True)
+            manager = TaskManager(MyTask, n_cores=16, n_cores_worker=4, use_ray=True)
             print(manager.max_concurrent_tasks)  # Output: 4
 
             # With 24 total cores and 1 core per worker (for I/O-bound tasks)
             manager = TaskManager(
-                IOBoundTask(), n_cores=24, n_cores_worker=1, use_ray=True
+                IOBoundTask, n_cores=24, n_cores_worker=1, use_ray=True
             )
             print(manager.max_concurrent_tasks)  # Output: 24
             ```
@@ -206,62 +203,63 @@ class TaskManager(Generic[InputType, OutputType]):
         logger.debug(f"Maximum number of concurrent tasks: {n_tasks}")
         return n_tasks
 
-    def task_generator(
-        self, items: InputType | Generator[InputType], chunk_size: int
-    ) -> Generator[tuple[int, InputType]]:
+    def batch_gen(
+        self,
+        data: BatchType,
+        batch_size: int,
+        prebatched: bool = False,
+    ) -> Generator[tuple[int, BatchType], None, None]:
         """
-        Splits a items into smaller chunks and yields each chunk for processing.
+        Splits a items into smaller batches and yields each batch for processing.
 
         If we detect that this is a generator, then we will assume it already
-        produces chunks.
+        produces batches.
 
         Args:
-            items: The complete list of items to be processed.
-            chunk_size: The number of items to include in each chunk. If the total number
-                of items is not evenly divisible by `chunk_size`, the final chunk will
+            data: Data to process.
+            batch_size: The number of items to include in each batch. If the total number
+                of items is not evenly divisible by `batch_size`, the final batch will
                 contain the remaining items.
 
-                If `items` is already a generator that chunks, then ensure that
-                `chunk_size` is set to `1`.
+                If `items` is already a generator that batches, then ensure that
+                `batch_size` is set to `1`.
+            prebatched: `data` is already an iterable of batches.
 
         Yields:
-            Each yielded value is a chunk index and sublist of `items` containing up to
-                `chunk_size` elements.
+            Each yielded value is a batch index and sublist of `items` containing up to
+                `batch_size` elements.
         """
-        index = 0
+        assert batch_size > 0, "chunk_size must be positive"
 
-        is_gen: bool = isgenerator(items)
-        if is_gen:
-            for item in items:
-                yield index, item
-                index += 1
+        if prebatched:
+            for idx, batch in enumerate(data):
+                yield idx, batch
             return
 
-        # Assume we need to chunk here.
-        current_chunk: list[InputType] = []
-        for item in items:
-            current_chunk.append(item)
-            if len(current_chunk) == chunk_size:
-                yield index, current_chunk
-                index += 1
-                current_chunk = []
-        if current_chunk:
-            yield index, current_chunk
+        it = iter(data)
+        for idx in range(1_000_000_000):
+            batch = list(islice(it, batch_size))
+            if not batch:
+                break
+            yield idx, batch
 
     def submit_tasks(
         self,
-        items: InputType | Generator[InputType],
-        chunk_size: int = 10,
+        data: BatchType,
+        batch_size: int = 10,
+        prebatched: bool = False,
         saver: Saver | None = None,
         save_interval: int = 10,
-        kwargs_task: dict[str, Any] = dict(),
-        kwargs_remote: dict[str, Any] = dict(),
-    ) -> ResultHandler[OutputType]:
+        args_task: tuple[object] | None = None,
+        kwargs_task: Mapping[str, object] | None = None,
+        args_remote: tuple[object] | None = None,
+        kwargs_remote: Mapping[str, object] | None = None,
+    ) -> ResultsHandler[OutputType]:
         """Submits and processes tasks in parallel or serial mode with optional
         periodic saving.
 
         This method is the primary entrypoint for task execution in the `TaskManager`.
-        It takes a list of items to process, chunks them into manageable batches,
+        It takes a list of items to process, batches them into manageable batches,
         and either processes them sequentially or distributes them across workers
         using Ray, depending on the `TaskManager`'s configuration.
 
@@ -270,17 +268,16 @@ class TaskManager(Generic[InputType, OutputType]):
         persistence of intermediate results during long-running computations.
 
         Args:
-            items: Items to process. This can also be a generator that already
-                chunks the items.
-            chunk_size: Number of items per processing chunk. Larger values may improve
-                performance but increase memory usage per worker. If `items` is
-                already a chunked generator, you
+            data: Data to process.
+            batch_size: Number of items per processing batch. Larger values may improve
+                performance but increase memory usage per worker.
+            prebatched: `data` is already an iterable of batches.
             saver: An optional [`Saver`][savers.core.Saver] instance that implements
                 the save method for persisting results. If provided, results will be
                 saved according to `save_interval`.
             save_interval: The number of results to accumulate before invoking the
                 `saver`. Has no effect if `saver` is `None`.
-            kwargs_task: Keyword arguments to pass to the task's run_chunk method.
+            kwargs_task: Keyword arguments to pass to the task's run_batch method.
                 These can be used to customize task execution behavior.
             kwargs_remote: Keyword arguments to pass to Ray's remote function options.
                 Only used when `use_ray=True`. Can include options like `max_retries`,
@@ -289,7 +286,7 @@ class TaskManager(Generic[InputType, OutputType]):
                 [`n_cores`][manager.TaskManager.n_cores] instead).
 
         Returns:
-            The [`ResultHandler`][results.handler.ResultHandler].
+            The [`ResultsHandler`][results.handler.ResultsHandler].
 
         Raises:
             ValueError: If the `saver`'s save method raises an exception.
@@ -308,7 +305,7 @@ class TaskManager(Generic[InputType, OutputType]):
 
             ```python
             # Create a task manager for sequential processing
-            manager = TaskManager(NumberSquareTask(), use_ray=False)
+            manager = TaskManager(NumberSquareTask, use_ray=False)
 
             # Process items without saving results
             manager.submit_tasks([1, 2, 3, 4, 5])
@@ -319,12 +316,12 @@ class TaskManager(Generic[InputType, OutputType]):
 
             ```python
             # Create a task manager with Ray for parallel processing
-            manager = TaskManager(TextProcessorTask(), use_ray=True, n_cores=8)
+            manager = TaskManager(TextProcessorTask, use_ray=True, n_cores=8)
 
-            # Process a large list of items in chunks of 50
+            # Process a large list of items in batches of 50
             manager.submit_tasks(
                 text_documents,
-                chunk_size=50,
+                batch_size=50,
                 kwargs_task={"min_length": 10, "language": "en"},
             )
             results = manager.get_results()
@@ -334,89 +331,108 @@ class TaskManager(Generic[InputType, OutputType]):
 
             ```python
             # Create a task manager and a saver for results
-            manager = TaskManager(DataAnalysisTask(), use_ray=True)
+            manager = TaskManager(DataAnalysisTask, use_ray=True)
             saver = HDF5Saver("results.h5", dataset_name="analysis_results")
 
             # Process items with saving every 1000 results
             manager.submit_tasks(
                 large_dataset,
-                chunk_size=200,
+                batch_size=200,
                 saver=saver,
                 save_interval=1000,
                 kwargs_remote={"max_retries": 3},
             )
             ```
         """
-        logger.info(f"Submitting tasks with chunk_size of {chunk_size}")
+        if kwargs_task is None:
+            kwargs_task = {}
+        if args_task is None:
+            args_task = tuple()
+        if kwargs_remote is None:
+            kwargs_remote = {}
+        if args_remote is None:
+            args_remote = tuple()
+        logger.info(f"Submitting tasks with batch_size of {batch_size}")
         self.result_handler.saver = saver
         self.result_handler.save_interval = save_interval
 
-        task_gen = self.task_generator(items, chunk_size)
+        batch_gen = self.batch_gen(data, batch_size, prebatched)
 
         if self.use_ray:
-            self._submit_ray(task_gen, kwargs_task, kwargs_remote)
+            self._submit_ray(
+                batch_gen, args_task, kwargs_task, args_remote, kwargs_remote
+            )
         else:
-            self._submit(task_gen, kwargs_task)
+            self._submit(batch_gen, args_task, kwargs_task)
 
         self.result_handler.finalize()
         return self.result_handler
 
     def _submit(
         self,
-        task_gen: Generator[tuple[int, InputType]],
-        kwargs_task: dict[str, Any] = dict(),
+        batch_gen: Generator[tuple[int, BatchType]],
+        args_task: tuple[object] | None = None,
+        kwargs_task: Mapping[str, object] | None = None,
     ) -> None:
         """
         Handles task submission and ordered result collection in sequential mode.
 
-        This method processes task chunks one at a time in the current process
-        (i.e., without parallelization via Ray). For each chunk produced by the
-        [`task_gen`][manager.TaskManager.task_generator] generator, a new
-        task instance is created from [`self.task`][task.Task] and its
-        [`run_chunk`][task.Task.run_chunk] method is invoked.
+        This method processes task batches one at a time in the current process
+        (i.e., without parallelization via Ray). For each batch produced by the
+        [`batch_gen`][manager.TaskManager.batch_gen] generator, a new
+        task instance is created from [`self.task_cls`][task.Task] and its
+        [`run_batch`][task.Task.run_batch] method is invoked.
 
         Args:
-            task_gen: Generator yielding chunks of items to process.
+            batch_gen: Generator yielding batches of items to process.
             kwargs_task: Additional keyword arguments to pass to the task's
-                `run_chunk` method.
+                `run_batch` method.
 
         Returns:
             None. The processed results are stored in the instance attribute
                 `self.results`.
         """
+        if args_task is None:
+            args_task = tuple()
+        if kwargs_task is None:
+            kwargs_task = {}
         logger.debug("Running tasks in serial")
-        for index, chunk in task_gen:
-            results_chunk = self.task.run_chunk(index, chunk, **kwargs_task)
-            self.result_handler.add_result(results_chunk)
+        for index, batch in batch_gen:
+            results_batch = self.task_cls().run_batch(
+                index, batch, *args_task, **kwargs_task
+            )
+            self.result_handler.add_result(results_batch)
             self.result_handler.save()
 
     def _submit_ray(
         self,
-        task_gen: Generator[tuple[int, InputType]],
-        kwargs_task: dict[str, Any] = dict(),
-        kwargs_remote: dict[str, Any] = dict(),
+        batch_gen: Generator[tuple[int, BatchType]],
+        args_task: tuple[object] | None = None,
+        kwargs_task: dict[str, object] | None = None,
+        args_remote: tuple[object] | None = None,
+        kwargs_remote: dict[str, object] | None = None,
     ) -> None:
         """
         Handles task submission and ordered result collection using Ray for parallel
         execution.
 
-        This method iterates over a generator of task chunks and submits each chunk as
+        This method iterates over a generator of task batches and submits each batch as
         a separate Ray task.
 
         To ensure that the final results are in the same order as the input items,
-        each submitted task is tagged with a unique chunk index. A mapping is
+        each submitted task is tagged with a unique batch index. A mapping is
         maintained between the string representation of each Ray ObjectRef and its
-        corresponding chunk index. As tasks complete,
+        corresponding batch index. As tasks complete,
         their results—which may be a list of items—are stored in a temporary
-        dictionary using their chunk index.
+        dictionary using their batch index.
 
-        Once contiguous chunks are available (starting from the first chunk),
-        these chunks are flushed into a final results list in order.
+        Once contiguous batches are available (starting from the first batch),
+        these batches are flushed into a final results list in order.
         Additionally, if a Saver is provided, results are periodically saved
         when the number of accumulated results reaches a specified interval.
 
         Args:
-            task_gen: A generator that yields chunks of items to process.
+            batch_gen: A generator that yields batches of items to process.
             kwargs_task: Additional keyword arguments to pass to the task's
                 processing function. Defaults to an empty dictionary.
             kwargs_remote: Additional keyword arguments to pass to Ray's remote
@@ -429,6 +445,10 @@ class TaskManager(Generic[InputType, OutputType]):
         """
         # pyright: reportUnknownMemberType=false, reportPossiblyUnboundVariable=false
         # pyright: reportUnknownArgumentType=false
+        if kwargs_task is None:
+            kwargs_task = {}
+        if kwargs_remote is None:
+            kwargs_remote = {}
         logger.debug("Running tasks in parallel with Ray")
         if not ray.is_initialized():
             logger.info("Initializing Ray.")
@@ -440,7 +460,7 @@ class TaskManager(Generic[InputType, OutputType]):
             self.n_cores = n_cores
 
         # Submit tasks and process completed ones as we go.
-        for index, chunk in task_gen:
+        for index, batch in batch_gen:
             # If the maximum concurrency is reached, wait for one task to finish.
             if len(self.futures) >= self.max_concurrent_tasks:
                 done_futures, self.futures = ray.wait(self.futures, num_returns=1)
@@ -450,10 +470,10 @@ class TaskManager(Generic[InputType, OutputType]):
                 self.result_handler.save()
 
             # Submit a new task to Ray.
-            logger.debug(f"Submitting Ray task which index of {chunk[0]}")
+            logger.debug(f"Submitting Ray task which index of {batch[0]}")
             future = ray_worker.options(
-                num_cpus=self.n_cores_worker, **kwargs_remote
-            ).remote(self.task, index, chunk, **kwargs_task)
+                num_cpus=self.n_cores_worker, *args_remote, **kwargs_remote
+            ).remote(self.task_cls, index, batch, *args_task, **kwargs_task)
             self.futures.append(future)
 
         # Process any remaining futures.
@@ -464,11 +484,11 @@ class TaskManager(Generic[InputType, OutputType]):
             self.result_handler.add_result(result)
             self.result_handler.save()
 
-    def get_handler(self) -> ResultHandler[OutputType]:
-        """Returns the `ResultHandler`.
+    def get_handler(self) -> ResultsHandler[OutputType]:
+        """Returns the `ResultsHandler`.
 
         Returns:
-            The `ResultHandler`.
+            The `ResultsHandler`.
         """
         return self.result_handler
 
@@ -497,7 +517,7 @@ class TaskManager(Generic[InputType, OutputType]):
         Examples:
             ```python
             # Create a task manager and submit tasks
-            manager = TaskManager(NumberSquareTask())
+            manager = TaskManager(NumberSquareTask)
             manager.submit_tasks([1, 2, 3, 4, 5])
 
             # Retrieve and use results

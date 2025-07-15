@@ -49,8 +49,8 @@ class HDF5Saver(Saver):
         saver = HDF5Saver("results.h5", dataset_name="experiment_1")
 
         # Use with TaskManager
-        task_manager = TaskManager(MyTask())
-        task_manager.submit_tasks(items, saver=saver, save_interval=100)
+        task_manager = TaskManager(MyTask)
+        task_manager.submit_tasks(batch, saver=saver, save_interval=100)
         ```
 
         Overwriting existing data:
@@ -152,7 +152,7 @@ class HDF5Saver(Saver):
                 - dtype: Data type for the numpy array conversion
                 - compression: Compression filter to use (e.g., "gzip", "lzf")
                 - compression_opts: Options for the compression filter
-                - chunks: Chunk shape for the dataset
+                - batches: Batch shape for the dataset
 
         Raises:
             ImportError: If the h5py library is not installed.
@@ -184,7 +184,7 @@ class HDF5Saver(Saver):
                 dtype="float32",
                 compression="gzip",
                 compression_opts=9,
-                chunks=(100,),
+                batches=(100,),
             )
             ```
 
@@ -209,7 +209,7 @@ class HDF5Saver(Saver):
             - HDF5 supports resizable datasets with the maxshape parameter, which
               is automatically configured for append operations.
             - For optimal performance with large datasets, configure appropriate
-              chunk sizes based on expected access patterns.
+              batch sizes based on expected access patterns.
         """
         if not has_h5py:
             raise ImportError("H5PY is not installed.")

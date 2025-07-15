@@ -10,9 +10,9 @@ from loguru import logger
 
 from .manager import TaskManager
 from .task import Task
-from .results import ResultHandler
+from .results import Result, ResultsHandler
 
-__all__ = ["TaskManager", "Task", "ResultHandler"]
+__all__ = ["TaskManager", "Task", "Result", "ResultsHandler"]
 
 logger.disable("raygent")
 

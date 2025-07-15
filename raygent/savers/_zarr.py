@@ -16,7 +16,7 @@ class ZarrSaver(Saver):
     """A saver that writes data to a Zarr array.
 
     `ZarrSaver` provides functionality to persist computational results in
-    [Zarr](https://zarr.dev/) format, which offers efficient chunked,
+    [Zarr](https://zarr.dev/) format, which offers efficient batched,
     compressed, N-dimensional array storage. [Zarr](https://zarr.dev/) is
     particularly well-suited for large arrays that don't fit in memory and
     for cloud-based storage, supporting both local and remote persistence.
@@ -49,8 +49,8 @@ class ZarrSaver(Saver):
         saver = ZarrSaver("results.zarr", dataset_name="experiment_1")
 
         # Use with TaskManager
-        task_manager = TaskManager(MyTask())
-        task_manager.submit_tasks(items, saver=saver, save_interval=100)
+        task_manager = TaskManager(MyTask)
+        task_manager.submit_tasks(batch, saver=saver, save_interval=100)
         ```
 
         Overwriting existing data:
@@ -94,7 +94,7 @@ class ZarrSaver(Saver):
     Notes:
         -   Zarr is particularly well-suited for large-scale numerical data and
             distributed computing workloads.
-        -   For optimal performance, consider chunk size carefully based on access
+        -   For optimal performance, consider batch size carefully based on access
             patterns.
         -   Unlike HDF5, Zarr allows concurrent reads and writes from multiple processes
             or machines, making it ideal for distributed computing.
@@ -150,7 +150,7 @@ class ZarrSaver(Saver):
             **kwargs: Additional keyword arguments passed to zarr.create_array or
                 zarr.open_array. Common options include:
 
-                - chunks: Chunk shape
+                - batches: Batch shape
                 - dtype: Data type
                 - compressor: Compression method (default: Blosc)
                 - filters: Pre-compression filters
@@ -174,7 +174,7 @@ class ZarrSaver(Saver):
             saver.save([6, 7, 8, 9, 10])
             ```
 
-            Saving with custom chunk size and compression:
+            Saving with custom batch size and compression:
 
             ```python
             import numcodecs
@@ -183,7 +183,7 @@ class ZarrSaver(Saver):
 
             # Save with customized storage parameters
             compressor = numcodecs.Blosc(cname="zstd", clevel=9)
-            saver.save(large_dataset, chunks=(1000,), compressor=compressor)
+            saver.save(large_dataset, batches=(1000,), compressor=compressor)
             ```
 
             Updating specific indices:
@@ -200,7 +200,7 @@ class ZarrSaver(Saver):
         Notes:
             -   The append operation is optimized for adding new data to existing
                 arrays without reading the entire array into memory.
-            -   For large datasets, consider specifying appropriate chunk sizes
+            -   For large datasets, consider specifying appropriate batch sizes
                 in kwargs when creating the array for the first time.
             -   When updating, the indices and data must have compatible shapes.
             -   Unlike HDF5, zarr supports concurrent reads and writes from multiple
