@@ -9252,12 +9252,12 @@ packages:
   requires_python: '>=3.9'
 - pypi: ./
   name: raygent
-  version: 0.1.dev41+g807a469.d20250712144847
-  sha256: 860c0d15e8dcc7f977d5fb076fa8d0e346da22814bed150d3898b16824c52f24
+  version: 0.1.dev58+g1f7bb09.d20250715124215
+  sha256: af845487958176a156b97d54f853e33d4cd74daf03ced2863e7b1805b66ac220
   requires_dist:
   - loguru>=0.7.2,<1.0
   - ray>=2.10.0,<3 ; extra == 'ray'
-  requires_python: '>=3.10'
+  requires_python: '>=3.12'
   editable: true
 - conda: https://conda.anaconda.org/conda-forge/linux-64/readline-8.2-h8c095d6_2.conda
   sha256: 2d6d0c026902561ed77cd646b5021aef2d4db22e57a5b0178dfc669231e06d2c
