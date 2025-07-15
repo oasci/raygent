@@ -256,7 +256,7 @@ class TaskManager(Generic[InputType, OutputType]):
         save_interval: int = 10,
         kwargs_task: dict[str, Any] = dict(),
         kwargs_remote: dict[str, Any] = dict(),
-    ) -> None:
+    ) -> ResultHandler[OutputType]:
         """Submits and processes tasks in parallel or serial mode with optional
         periodic saving.
 
@@ -289,8 +289,7 @@ class TaskManager(Generic[InputType, OutputType]):
                 [`n_cores`][manager.TaskManager.n_cores] instead).
 
         Returns:
-            None. Results are stored internally and can be retrieved using
-                [`get_results()`][manager.TaskManager.get_results].
+            The [`ResultHandler`][results.handler.ResultHandler].
 
         Raises:
             ValueError: If the `saver`'s save method raises an exception.
@@ -360,6 +359,7 @@ class TaskManager(Generic[InputType, OutputType]):
             self._submit(task_gen, kwargs_task)
 
         self.result_handler.finalize()
+        return self.result_handler
 
     def _submit(
         self,
@@ -464,7 +464,15 @@ class TaskManager(Generic[InputType, OutputType]):
             self.result_handler.add_result(result)
             self.result_handler.save()
 
-    def get_results(self) -> ResultHandler[OutputType]:
+    def get_handler(self) -> ResultHandler[OutputType]:
+        """Returns the `ResultHandler`.
+
+        Returns:
+            The `ResultHandler`.
+        """
+        return self.result_handler
+
+    def get_results(self) -> list[OutputType]:
         """Retrieves all collected results from completed tasks.
 
         This method provides access to the accumulated results that have been
@@ -472,7 +480,7 @@ class TaskManager(Generic[InputType, OutputType]):
         the `TaskManager`. Results are stored in the order they were processed.
 
         If a saver was provided during task submission, the results returned by
-        this method will be the same as those that were passed to the saver.
+        this method will return nothing.
 
         Returns:
             A list containing the results from all completed tasks. The structure
@@ -500,4 +508,4 @@ class TaskManager(Generic[InputType, OutputType]):
             sum_of_squares = sum(results)  # 55
             ```
         """
-        return self.result_handler
+        return self.result_handler.get()

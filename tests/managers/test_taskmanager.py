@@ -27,8 +27,7 @@ def test_submit_tasks_sequential():
     )
 
     task_manager.submit_tasks(items, chunk_size=2)
-    result_handler: ResultHandler[list[float]] = task_manager.get_results()
-    results = result_handler.get()
+    results = task_manager.get_results()
     flattened = _flatten_results(results)
     assert flattened == [2, 4, 6, 8, 10]
 
@@ -41,8 +40,7 @@ def test_submit_tasks_parallel():
     items = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     task_manager.submit_tasks(items, chunk_size=2)
 
-    result_handler: ResultHandler[list[float]] = task_manager.get_results()
-    results = result_handler.get()
+    results = task_manager.get_results()
     flattened = _flatten_results(results)
 
     assert task_manager.max_concurrent_tasks == 2
