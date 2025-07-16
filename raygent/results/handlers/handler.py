@@ -1,12 +1,10 @@
-from typing import Generic
+from typing import Any, Generic, TypeVar
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
 
 from loguru import logger
 
 from raygent.dtypes import OutputType
-from raygent.results import Result
 from raygent.savers import Saver
 
 
@@ -31,7 +29,7 @@ class ResultsHandler(ABC, Generic[OutputType]):
     @abstractmethod
     def add_result(
         self,
-        result: Result[OutputType],
+        result: Any,
         *args: object,
         **kwargs: object,
     ) -> None:
@@ -44,7 +42,7 @@ class ResultsHandler(ABC, Generic[OutputType]):
         """
 
     @abstractmethod
-    def get(self) -> Sequence[OutputType] | object:
+    def get(self) -> Any:
         """Get the Results"""
 
     def save(self) -> None:
@@ -62,3 +60,6 @@ class ResultsHandler(ABC, Generic[OutputType]):
     def finalize(self) -> None:
         """Finish up any handling"""
         logger.warning(f"finalize is not implemented on {self}")
+
+
+HandlerType = TypeVar("HandlerType", bound=ResultsHandler[Any])

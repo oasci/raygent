@@ -48,7 +48,7 @@ class NumpySaver(Saver):
         saver = NumpySaver("results.npy")
 
         # Use with TaskManager
-        task_manager = TaskManager(MyTask)
+        task_manager = TaskManager(MyTask, ResultsCollector)
         task_manager.submit_tasks(batch, saver=saver, save_interval=100)
         ```
 

@@ -3,7 +3,8 @@ from typing import TYPE_CHECKING
 import ray
 
 if TYPE_CHECKING:
-    from raygent import Result, Task
+    from raygent import Task
+    from raygent.results import IndexedResult
 
 from raygent.dtypes import BatchType, OutputType
 
@@ -15,7 +16,7 @@ def ray_worker(
     batch: BatchType,
     *args: object,
     **kwargs: object,
-) -> "Result[OutputType]":
+) -> "IndexedResult[OutputType]":
     """
     Remote Ray worker function that processes tasks in parallel.
 
@@ -46,7 +47,7 @@ def ray_worker(
 
         ```python
         # This is handled automatically by TaskManager when use_ray=True
-        manager = TaskManager(MyTask, use_ray=True)
+        manager = TaskManager(MyTask, ResultsCollector, use_ray=True)
         manager.submit_tasks(batch)
         ```
 

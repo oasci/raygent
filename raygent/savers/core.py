@@ -18,44 +18,6 @@ class Saver(ABC, Generic[OutputType]):
     cloud storage, or other destinations using various formats and approaches.
 
     Custom Savers can be created by subclassing and implementing the save method.
-
-    Examples:
-        Using a Saver with TaskManager:
-
-        ```python
-        # Create a TaskManager with a Saver
-        task_manager = TaskManager(MyTask, use_ray=True)
-        saver = HDF5Saver("results.h5", dataset_name="experiment_1")
-
-        # Submit tasks with periodic saving
-        task_manager.submit_tasks(batch, saver=saver, save_interval=100)
-        ```
-
-        Creating a custom Saver:
-
-        ```python
-        class CSVSaver(Saver):
-            def __init__(self, file_path):
-                self.file_path = file_path
-                self.file_exists = os.path.exists(file_path)
-
-            def save(self, data, indices=None, **kwargs):
-                mode = "a" if self.file_exists else "w"
-                header = not self.file_exists
-
-                import pandas as pd
-
-                df = pd.DataFrame(data)
-                df.to_csv(self.file_path, mode=mode, header=header, index=False)
-                self.file_exists = True
-        ```
-
-    Notes:
-        - Savers are used by TaskManager to persist intermediate results during
-          long-running computations, reducing memory pressure.
-        - A single Saver instance may be called multiple times during task execution,
-          so implementations should handle appending or updating existing data.
-        - Error handling within save methods is important to prevent data loss.
     """
 
     @abstractmethod

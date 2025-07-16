@@ -1,11 +1,12 @@
-from typing import Protocol
+from typing import Generic
 
 from dataclasses import dataclass
 
 from raygent.dtypes import OutputType
 
 
-class Result(Protocol[OutputType]):
+@dataclass
+class Result(Generic[OutputType]):
     value: OutputType | None
     """Computed values returned by [`do()`][task.Task.do]."""
 
@@ -18,9 +19,6 @@ class IndexedResult(Result[OutputType]):
 
     index: int
     """Index to specify the order of batches."""
-
-    value: OutputType | None = None
-    """Computed values returned by [`do()`][task.Task.do]."""
 
 
 @dataclass

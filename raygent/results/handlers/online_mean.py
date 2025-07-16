@@ -1,15 +1,13 @@
 from typing import override
 
-import numpy as np
-import numpy.typing as npt
-
-from raygent.dtypes import OutputType
+from raygent.dtypes import NumericType
 from raygent.results import MeanResult
 from raygent.results.handlers import ResultsHandler
+from raygent.results.result import IndexedResult
 from raygent.savers import Saver
 
 
-class OnlineMeanResultsHandler(ResultsHandler[OutputType]):
+class OnlineMeanResultsHandler(ResultsHandler[NumericType]):
     r"""
     `OnlineMeanResultsHandler` provides a numerically stable, online (incremental)
     algorithm to compute the arithmetic mean of large, streaming, or distributed
@@ -57,16 +55,17 @@ class OnlineMeanResultsHandler(ResultsHandler[OutputType]):
     """
 
     def __init__(
-        self, saver: Saver[OutputType] | None = None, save_interval: int = 1
+        self, saver: Saver[NumericType] | None = None, save_interval: int = 1
     ) -> None:
         """
-        The handler starts with no accumulated data. The global mean (`global_mean`)
-        is initially set to None, and it will be defined by the first partial result
-        received. The total number of observations (`total_count`) is initialized to
-        zero.
+        Args:
+            saver: An instance of a Saver responsible for persisting results. If None,
+                no saving is performed.
+            save_interval: The minimum number of results required before triggering
+                a save.
         """
 
-        self.global_mean: npt.NDArray[np.float64] | None = None
+        self.mean: NumericType | None = None
         """
         The current global mean of all processed observations.
         """
@@ -80,7 +79,7 @@ class OnlineMeanResultsHandler(ResultsHandler[OutputType]):
     @override
     def add_result(
         self,
-        result: MeanResult[OutputType],
+        result: IndexedResult[MeanResult[NumericType]],
         *args: object,
         **kwargs: object,
     ) -> None:
@@ -89,18 +88,25 @@ class OnlineMeanResultsHandler(ResultsHandler[OutputType]):
         """
         if result.value is None:
             return
-        if self.global_mean is None:
-            self.global_mean = np.array(result.value, dtype=np.float64)
-            self.total_count = result.count
         else:
-            new_total = self.total_count + result.count
-            self.global_mean = self.global_mean + (result.value - self.global_mean) * (
-                result.count / new_total
-            )
-            self.total_count = new_total
+            mean_result = result.value
+
+        if mean_result.value is None:
+            return
+
+        if self.mean is None:
+            self.mean = mean_result.value
+            self.total_count = mean_result.count
+            return
+
+        new_total = self.total_count + mean_result.count
+        self.mean = self.mean + (mean_result.value - self.mean) * (
+            mean_result.count / new_total
+        )
+        self.total_count = new_total
 
     @override
-    def get(self) -> MeanResult[OutputType]:
+    def get(self) -> MeanResult[NumericType]:
         """
         Retrieves the final computed global mean along with the total number of
         observations.
@@ -116,6 +122,6 @@ class OnlineMeanResultsHandler(ResultsHandler[OutputType]):
             ValueError: If no data has been processed (i.e., `global_mean` is None or
                 `total_count` is zero).
         """
-        if self.global_mean is None or self.total_count == 0:
+        if self.mean is None or self.total_count == 0:
             raise ValueError("No data has been processed.")
-        return MeanResult[OutputType](value=self.global_mean, count=self.total_count)
+        return MeanResult[NumericType](value=self.mean, count=self.total_count)
