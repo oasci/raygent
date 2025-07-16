@@ -49,7 +49,7 @@ class SquareTask(
 # Create a task manager
 manager = TaskManager[
     list[float], ResultsCollector[list[float]]
-](SquareTask, ResultsCollector, use_ray=True)
+](SquareTask, ResultsCollector, in_parallel=True)
 
 # Process items in parallel
 handler = manager.submit_tasks(batch=[1., 2., 3., 4., 5.])

@@ -16,10 +16,10 @@ class DummyTask(Task[list[float], list[float]]):
 
 @pytest.fixture
 def dummy_task_manager():
-    # For testing, use DummyTask and sequential mode (use_ray=False).
+    # For testing, use DummyTask and sequential mode (in_parallel=False).
     result_handler = ResultsCollector[list[float]]
     manager = TaskManager[list[float], ResultsCollector[list[float]]](
-        task_cls=DummyTask, handler_cls=result_handler, use_ray=False
+        task_cls=DummyTask, handler_cls=result_handler, in_parallel=False
     )
     return manager
 

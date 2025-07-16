@@ -22,7 +22,7 @@ def _flatten_results(results):
 def test_submit_tasks_sequential():
     batch = [1.0, 2.0, 3.0, 4.0, 5.0]
     task_manager: TaskManager[list[float], ResultsCollector[list[float]]] = TaskManager(
-        DummyTask, ResultsCollector, use_ray=False
+        DummyTask, ResultsCollector, in_parallel=False
     )
 
     handler = task_manager.submit_tasks(batch, batch_size=2)
@@ -33,7 +33,7 @@ def test_submit_tasks_sequential():
 
 def test_submit_tasks_parallel():
     task_manager = TaskManager[list[float], ResultsCollector[list[float]]](
-        DummyTask, ResultsCollector, use_ray=True
+        DummyTask, ResultsCollector, in_parallel=True
     )
     task_manager.n_cores = 2
     task_manager.n_cores_worker = 1

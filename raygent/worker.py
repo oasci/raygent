@@ -46,8 +46,8 @@ def ray_worker(
         Basic usage through [`TaskManager`][manager.TaskManager] (recommended):
 
         ```python
-        # This is handled automatically by TaskManager when use_ray=True
-        manager = TaskManager(MyTask, ResultsCollector, use_ray=True)
+        # This is handled automatically by TaskManager when in_parallel=True
+        manager = TaskManager(MyTask, ResultsCollector, in_parallel=True)
         manager.submit_tasks(batch)
         ```
 

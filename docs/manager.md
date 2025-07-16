@@ -20,7 +20,7 @@ from raygent import TaskManager
 from raygent.results.handlers import ResultsCollector
 from my_tasks import ExampleTask
 
-manager = TaskManager(ExampleTask, ResultsCollector, n_cores=4, use_ray=True)
+manager = TaskManager(ExampleTask, ResultsCollector, n_cores=4, in_parallel=True)
 ```
 
 ## Submitting Tasks
