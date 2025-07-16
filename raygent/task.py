@@ -12,19 +12,13 @@ class Task(ABC, Generic[BatchType, OutputType]):
     The `Task` class provides a flexible framework for processing data items and
     serves as the core computational unit in the `raygent` framework.
 
-    This class implements the Template Method pattern, where the base class (`Task`)
-    defines the protocol of an algorithm in its [`run_batch`][task.Task.run_batch] method,
-    while deferring some steps to subclasses through the
-    [`do`][task.Task.do] method.
-
     **Types**
 
     To write a new [`Task`][task.Task], you need to first understand what your
-    `InputType` and `OutputType` will be. These types specify what data that
-    [`do`][task.Task.do] will receive in `items` and
-    expected to return.
-    Note that [`items`][task.Task.do] assumes a batch of multiple values
-    will be provided. If your task is to square numbers, then you would provide
+    [`InputType`][dtypes.InputType] and [`OutputType`][dtypes.OutputType] will be.
+    These types specify what data that [`do`][task.Task.do] will receive in `items` and
+    expected to return. Note that [`do`][task.Task.do] assumes a batch of multiple
+    values will be provided. If your task is to square numbers, then you would provide
     something like:
 
     ```python
@@ -37,7 +31,7 @@ class Task(ABC, Generic[BatchType, OutputType]):
     ```python
     SumTask(Task[list[float], float]):
     ```
-    Performing operations on NumPy arrays can be specified the same way, except now
+    Performing operations on NumPy arrays are specified the same way, except now
     we get arrays for `InputType` and `OutputType`.
 
     ```python
@@ -103,7 +97,8 @@ class Task(ABC, Generic[BatchType, OutputType]):
         *args: object,
         **kwargs: object,
     ) -> IndexedResult[OutputType]:
-        """This method serves as the primary entry point for task execution.
+        """This method serves as the primary entry point for
+        [`TaskManager`][manager.TaskManager].
 
         Args:
             index: A unique integer used to specify ordering for
@@ -119,7 +114,8 @@ class Task(ABC, Generic[BatchType, OutputType]):
                 [`teardown`][task.Task.teardown].
 
         Returns:
-            Results of processing all data in `items`.
+            [`IndexedResult`][results.result.IndexedResult] of processing all data in
+                `batch`.
 
         Example:
             ```python
@@ -129,7 +125,8 @@ class Task(ABC, Generic[BatchType, OutputType]):
 
 
             task = NumberSquarerTask()
-            result = task.run_batch(0, [1.0, 2.0, 3.0, 4.0, 5.0])
+            handler = task.run_batch(0, [1.0, 2.0, 3.0, 4.0, 5.0])
+            results = handler.get()  # [1.0, 4.0, 6.0, 8.0, 10.0]
             ```
         """
         self.setup(**kwargs)
@@ -148,33 +145,29 @@ class Task(ABC, Generic[BatchType, OutputType]):
         *args: object,
         **kwargs: object,
     ) -> OutputType | Exception:
-        """Processes multiple items at once in a batch operation.
+        """Batch process data.
 
         This method defines the computation logic for batch processing a collection
-        of items together. It is called by the [`run_batch`][task.Task.run_batch].
+        of data together. It is called by the [`run_batch`][task.Task.run_batch].
 
         Args:
             batch: Data to be processed together.
-            **kwargs: Additional keyword arguments that customize processing behavior.
-                These arguments are passed directly from the `run_batch` method.
+            *args: Additional arguments.
+            **kwargs: Additional keyword arguments.
 
         Returns:
-            The processed results for all items, typically a list matching the input
-                length, but could be any structure depending on the implementation.
-
-        Raises:
-            NotImplementedError: If the class does not implement this method.
+            The processed results for all data.
 
         Example:
             ```python
             class DocumentVectorizerTask(Task[str, list[dict[str, Any]]]):
-                def do(self, items, **kwargs):
+                def do(self, batch, *args, **kwargs):
                     # Load model once for all documents
                     vectorizer = load_large_language_model()
 
                     # Process all documents in an optimized batch operation
                     # which is much faster than processing one at a time
-                    embeddings = vectorizer.encode_batch(items)
+                    embeddings = vectorizer.encode_batch(batch)
 
                     # Return results paired with original items
                     return [
