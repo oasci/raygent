@@ -39,7 +39,7 @@ class WorkflowGraph:
     ) -> "WorkflowGraph":
         return cls({n.name: n for n in nodes}, list(edges))
 
-    def parents(self, node: str) -> Sequence[WorkflowNodeAny]:
+    def parents(self, node: str) -> Sequence[WorkflowEdgeAny]:
         return [e for e in self.edges if e.dst == node]
 
     def children(self, node: str) -> Sequence[WorkflowEdgeAny]:
