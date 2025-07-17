@@ -11,7 +11,7 @@ TEST_DIR = os.path.dirname(__file__)
 @pytest.fixture(scope="session", autouse=True)
 def setup_tests():
     enable_logging(10)
-    ray.init(runtime_env={"py_modules": [os.path.join(TEST_DIR, "managers")]})
+    ray.init(runtime_env={"py_modules": [os.path.join(TEST_DIR, "runners")]})
 
 
 @pytest.fixture

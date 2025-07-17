@@ -1,4 +1,4 @@
-from typing import Any, Callable, Generic, ParamSpec, TypeVar, get_type_hints
+from typing import Any, Callable, Generic, ParamSpec, TypeAlias, TypeVar, get_type_hints
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -7,10 +7,10 @@ UpOutT = TypeVar("UpOutT")  # upstream OutputType
 SelT = TypeVar("SelT")  # after selector
 DownInT = TypeVar("DownInT")  # final contribution to dst batch
 
-Selector = Callable[[UpOutT], SelT]
-Transform = Callable[[SelT], DownInT]
+Selector: TypeAlias = Callable[[UpOutT], SelT]
+Transform: TypeAlias = Callable[[SelT], DownInT]
 
-P = ParamSpec("P")  # not used yet but reserved for future hooks
+P = ParamSpec("P")
 
 
 @dataclass(slots=True)
@@ -20,8 +20,14 @@ class WorkflowEdge(Generic[UpOutT, SelT, DownInT]):
     """
 
     src: str
+    """Name of source node."""
+
     dst: str
+    """Name of destination node."""
+
     dst_key: str
+    """Name of data this edge provides to `dst`."""
+
     selector: Selector | None = None
     transform: Transform | None = None
     broadcast: bool = False

@@ -6,10 +6,10 @@ from ast import literal_eval
 
 from loguru import logger
 
-from .manager import TaskManager
+from .runner import TaskRunner
 from .task import Task
 
-__all__ = ["TaskManager", "Task"]
+__all__ = ["TaskRunner", "Task"]
 
 logger.disable("raygent")
 

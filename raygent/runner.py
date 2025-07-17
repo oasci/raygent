@@ -20,9 +20,9 @@ if TYPE_CHECKING:
     from raygent import Task
 
 
-class TaskManager(Generic[BatchType, HandlerType]):
+class TaskRunner(Generic[BatchType, HandlerType]):
     """
-    A manager class for handling task submissions and result handling using serial
+    A runner class for handling task submissions and result handling using serial
     or parallel computation.
     """
 
@@ -75,10 +75,10 @@ class TaskManager(Generic[BatchType, HandlerType]):
         Example:
             ```python
             # Serial processing
-            manager = TaskManager(MyTask, ResultsCollector, in_parallel=False)
+            runner = TaskRunner(MyTask, ResultsCollector, in_parallel=False)
 
             # Parallel processing
-            manager = TaskManager(MyTask, ResultsCollector, in_parallel=True)
+            runner = TaskRunner(MyTask, ResultsCollector, in_parallel=True)
             ```
         """
 
@@ -100,10 +100,10 @@ class TaskManager(Generic[BatchType, HandlerType]):
         Example:
             ```python
             # Use all available cores
-            manager = TaskManager(MyTask, ResultsCollector, in_parallel=True, n_cores=-1)
+            runner = TaskRunner(MyTask, ResultsCollector, in_parallel=True, n_cores=-1)
 
             # Use up to 4 cores
-            manager = TaskManager(MyTask, ResultsCollector, in_parallel=True, n_cores=4)
+            runner = TaskRunner(MyTask, ResultsCollector, in_parallel=True, n_cores=4)
             ```
         """
 
@@ -124,13 +124,13 @@ class TaskManager(Generic[BatchType, HandlerType]):
         Example:
             ```python
             # Each task gets 1 core (maximum task parallelism)
-            manager = TaskManager(SimpleTask, ResultsCollector, in_parallel=True, n_cores_worker=1)
+            runner = TaskRunner(SimpleTask, ResultsCollector, in_parallel=True, n_cores_worker=1)
 
             # Each task gets 2 cores (good for moderately parallel tasks)
-            manager = TaskManager(ComputeTask, ResultsCollector, in_parallel=True, n_cores_worker=2)
+            runner = TaskRunner(ComputeTask, ResultsCollector, in_parallel=True, n_cores_worker=2)
 
             # Each task gets 4 cores (for tasks with internal parallelism)
-            manager = TaskManager(ParallelTask, ResultsCollector, in_parallel=True, n_cores_worker=4)
+            runner = TaskRunner(ParallelTask, ResultsCollector, in_parallel=True, n_cores_worker=4)
             ```
         """
 
@@ -176,26 +176,26 @@ class TaskManager(Generic[BatchType, HandlerType]):
         Examples:
             ```python
             # With 8 total cores and 2 cores per worker
-            manager = TaskManager(
+            runner = TaskRunner(
                 MyTask, ResultsCollector, n_cores=8, n_cores_worker=2, in_parallel=True
             )
-            print(manager.max_concurrent_tasks)  # Output: 4
+            print(runner.max_concurrent_tasks)  # Output: 4
 
             # With 16 total cores and 4 cores per worker
-            manager = TaskManager(
+            runner = TaskRunner(
                 MyTask, ResultsCollector, n_cores=16, n_cores_worker=4, in_parallel=True
             )
-            print(manager.max_concurrent_tasks)  # Output: 4
+            print(runner.max_concurrent_tasks)  # Output: 4
 
             # With 24 total cores and 1 core per worker (for I/O-bound tasks)
-            manager = TaskManager(
+            runner = TaskRunner(
                 IOBoundTask,
                 ResultsCollector,
                 n_cores=24,
                 n_cores_worker=1,
                 in_parallel=True,
             )
-            print(manager.max_concurrent_tasks)  # Output: 24
+            print(runner.max_concurrent_tasks)  # Output: 24
             ```
         """
         n_tasks: int = max(1, int(self.n_cores // self.n_cores_worker))
@@ -251,7 +251,7 @@ class TaskManager(Generic[BatchType, HandlerType]):
     ) -> HandlerType:
         """Submits and processes tasks in serial or parallel mode.
 
-        This method is the primary entrypoint for task execution in the `TaskManager`.
+        This method is the primary entrypoint for task execution in the `TaskRunner`.
         It takes data and batches, processes, and handles all results. Note that
         `self.handler` is set here and will overwrite if present.
 
@@ -266,15 +266,15 @@ class TaskManager(Generic[BatchType, HandlerType]):
             kwargs_remote: Keyword arguments to pass to Ray's remote function options.
                 Only used when `in_parallel=True`. Can include options like `max_retries`,
                 `num_gpus`, etc., but not `num_cpus` (use
-                [`n_cores_worker`][manager.TaskManager.n_cores_worker] and
-                [`n_cores`][manager.TaskManager.n_cores] instead).
+                [`n_cores_worker`][runner.TaskRunner.n_cores_worker] and
+                [`n_cores`][runner.TaskRunner.n_cores] instead).
 
         Returns:
-            The [results handler][manager.TaskManager.handler_cls] after processing
+            The [results handler][runner.TaskRunner.handler_cls] after processing
                 all batches.
 
         Notes:
-            -   When `in_parallel=True` in the TaskManager, this method leverages Ray for
+            -   When `in_parallel=True` in the TaskRunner, this method leverages Ray for
             parallel execution across cores or machines.
             -   When `in_parallel=False`, tasks are processed sequentially in the
                 current process.
@@ -283,24 +283,24 @@ class TaskManager(Generic[BatchType, HandlerType]):
             Sequential processing:
 
             ```python
-            # Create a task manager for sequential processing
-            manager = TaskManager(NumberSquareTask, ResultsCollector, in_parallel=False)
+            # Create a task runner for sequential processing
+            runner = TaskRunner(NumberSquareTask, ResultsCollector, in_parallel=False)
 
             # Process items without saving results
-            handler = manager.submit_tasks([1, 2, 3, 4, 5])
+            handler = runner.submit_tasks([1, 2, 3, 4, 5])
             results = handler.get()  # [1, 4, 9, 16, 25]
             ```
 
             Parallel processing with Ray:
 
             ```python
-            # Create a task manager with Ray for parallel processing
-            manager = TaskManager(
+            # Create a task runner with Ray for parallel processing
+            runner = TaskRunner(
                 TextProcessorTask, ResultsCollector, in_parallel=True, n_cores=8
             )
 
             # Process a large list of items in batches of 50
-            handler = manager.submit_tasks(
+            handler = runner.submit_tasks(
                 text_documents,
                 batch_size=50,
                 kwargs_task={"min_length": 10, "language": "en"},
@@ -334,7 +334,7 @@ class TaskManager(Generic[BatchType, HandlerType]):
 
         This method processes task batches one at a time in the current process
         (i.e., without parallelization via Ray). For each batch produced by the
-        [`batch_gen`][manager.TaskManager.batch_gen] generator, a new
+        [`batch_gen`][runner.TaskRunner.batch_gen] generator, a new
         task instance is created from [`self.task_cls`][task.Task] and its
         [`run_batch`][task.Task.run_batch] method is invoked.
 

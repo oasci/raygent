@@ -50,7 +50,7 @@ class ResultsHandler(ABC, Generic[OutputType]):
         Persists a slice of the currently collected results if a saving interval
         has been met.
 
-        This method is typically called by a TaskManager after each batch is added.
+        This method is typically called by a TaskRunner after each batch is added.
         If a Saver is provided and the number of collected results meets or exceeds
         the specified save_interval, a slice of results is saved using the saver,
         and the saved results are removed from the in-memory collection.

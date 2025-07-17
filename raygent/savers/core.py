@@ -10,7 +10,7 @@ class Saver(ABC, Generic[OutputType]):
 
     The Saver class provides a standardized interface for persisting computational
     results across the raygent framework. It abstracts away the details of how
-    and where data is stored, allowing TaskManager to work with different storage
+    and where data is stored, allowing TaskRunner to work with different storage
     backends without modification.
 
     This design follows the Strategy pattern, where different concrete Saver
@@ -45,7 +45,7 @@ class Saver(ABC, Generic[OutputType]):
                 on the specific Saver implementation. Default is None.
             **kwargs: Additional keyword arguments that may be used by specific
                 saver implementations. These arguments are typically passed from
-                TaskManager.save_kwargs and can include parameters like data types,
+                TaskRunner.save_kwargs and can include parameters like data types,
                 compression options, or format-specific settings.
 
         Returns:

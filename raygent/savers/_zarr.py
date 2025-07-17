@@ -48,9 +48,9 @@ class ZarrSaver(Saver):
         # Create a ZarrSaver for appending data
         saver = ZarrSaver("results.zarr", dataset_name="experiment_1")
 
-        # Use with TaskManager
-        task_manager = TaskManager(MyTask, ResultsCollector)
-        task_manager.submit_tasks(batch, saver=saver, save_interval=100)
+        # Use with TaskRunner
+        task_runner = TaskRunner(MyTask, ResultsCollector)
+        task_runner.submit_tasks(batch, saver=saver, save_interval=100)
         ```
 
         Overwriting existing data:

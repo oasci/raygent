@@ -36,7 +36,7 @@ It removes boilerplate code and offers a modular approach to managing parallel t
 ## Quick Start
 
 ```python
-from raygent import Task, TaskManager
+from raygent import Task, TaskRunner
 from raygent.results.handlers import ResultsCollector
 
 # Define your task
@@ -46,13 +46,13 @@ class SquareTask(
     def do(self, batch):
         return [item ** 2 for item in batch]
 
-# Create a task manager
-manager = TaskManager[
+# Create a task runner
+runner = TaskRunner[
     list[float], ResultsCollector[list[float]]
 ](SquareTask, ResultsCollector, in_parallel=True)
 
 # Process items in parallel
-handler = manager.submit_tasks(batch=[1., 2., 3., 4., 5.])
+handler = runner.submit_tasks(batch=[1., 2., 3., 4., 5.])
 results = handler.get()  # [1., 4., 9., 16., 25.]
 ```
 

@@ -8,7 +8,7 @@ from raygent.results import IndexedResult
 P = ParamSpec("P")
 
 
-class Task(ABC, Generic[BatchType, OutputType, P]):
+class Task(ABC, Generic[BatchType, OutputType]):
     """Protocol for executing computational tasks on collections of data.
 
     The `Task` class provides a flexible framework for processing data items and
@@ -68,7 +68,7 @@ class Task(ABC, Generic[BatchType, OutputType, P]):
     ```
 
     !!! note
-        [`TaskManager`][manager.TaskManager] calls [`run_batch()`][task.Task.run_batch] to
+        [`TaskRunner`][runner.TaskRunner] calls [`run_batch()`][task.Task.run_batch] to
         produce a [`Result`][results.Result] to handle any setup, teardown, and
         errors.
 
@@ -86,13 +86,13 @@ class Task(ABC, Generic[BatchType, OutputType, P]):
     def __init__(self) -> None:
         super().__init__()
 
-    def setup(self, *args: P.args, **kwargs: P.kwargs) -> None:
+    def setup[**P](self, *args: P.args, **kwargs: P.kwargs) -> None:
         """Optional setup method called once before processing begins."""
 
-    def teardown(self, *args: P.args, **kwargs: P.kwargs) -> None:
+    def teardown[**P](self, *args: P.args, **kwargs: P.kwargs) -> None:
         """Optional teardown method called once after all processing is complete."""
 
-    def run_batch(
+    def run_batch[**P](
         self,
         index: int,
         batch: BatchType,
@@ -100,7 +100,7 @@ class Task(ABC, Generic[BatchType, OutputType, P]):
         **kwargs: P.kwargs,
     ) -> IndexedResult[OutputType]:
         """This method serves as the primary entry point for
-        [`TaskManager`][manager.TaskManager].
+        [`TaskRunner`][runner.TaskRunner].
 
         Args:
             index: A unique integer used to specify ordering for
@@ -141,7 +141,7 @@ class Task(ABC, Generic[BatchType, OutputType, P]):
         return result
 
     @abstractmethod
-    def do(
+    def do[**P](
         self,
         batch: BatchType,
         *args: P.args,

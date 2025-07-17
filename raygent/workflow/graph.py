@@ -90,15 +90,15 @@ class WorkflowGraph:
             dst_node = self.nodes[edge.dst]
 
             # --- infer upstream output type ---------------------------- #
-            tm = src_node._resolve_manager()
+            tm = src_node._resolve_runner()
             upstream_out_type: type[Any] = getattr(
                 tm,
                 "output_type",
-                Any,  # fallback; you can refine TaskManager
+                Any,  # fallback; you can refine TaskRunner
             )
 
             # --- confirm downstream accepts dict[str, Any] ------------- #
-            tm_down = dst_node._resolve_manager()
+            tm_down = dst_node._resolve_runner()
             downstream_input_type: type[Any] = getattr(tm_down, "input_type", Mapping)
             downstream_is_dict = (
                 downstream_input_type in _DICT_OR_MAPPING

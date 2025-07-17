@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum, auto
 
-from raygent import TaskManager
+from raygent import TaskRunner
 from raygent.dtypes import BatchType
 from raygent.results.handlers import HandlerType
 
@@ -31,11 +31,11 @@ class RetryPolicy:
 class WorkflowNode(Generic[BatchType, HandlerType, P]):
     """
     A single vertex in a Workflow DAG.  Each node owns (or can lazily create)
-    one `TaskManager` that performs the underlying work.
+    one `TaskRunner` that performs the underlying work.
     """
 
     name: str
-    manager: TaskManager[BatchType, HandlerType]
+    runner: TaskRunner[BatchType, HandlerType]
 
     retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
     kwargs_task: Mapping[str, Any] = field(default_factory=dict)
@@ -51,8 +51,8 @@ class WorkflowNode(Generic[BatchType, HandlerType, P]):
     results_ref: Any | None = field(init=False, default=None)
     input_ref: Any | None = field(init=False, default=None)
 
-    def _resolve_manager(self) -> TaskManager[BatchType, HandlerType]:
-        return self.manager
+    def _resolve_runner(self) -> TaskRunner[BatchType, HandlerType]:
+        return self.runner
 
     def mark_started(self) -> None:
         self.status, self.started_at = NodeStatus.RUNNING, datetime.now()

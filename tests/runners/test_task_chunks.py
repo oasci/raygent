@@ -2,7 +2,7 @@ from typing import override
 
 import pytest
 
-from raygent import Task, TaskManager
+from raygent import Task, TaskRunner
 from raygent.results.handlers import ResultsCollector
 
 
@@ -15,23 +15,23 @@ class DummyTask(Task[list[float], list[float]]):
 
 
 @pytest.fixture
-def dummy_task_manager():
+def dummy_task_runner():
     # For testing, use DummyTask and sequential mode (in_parallel=False).
     result_handler = ResultsCollector[list[float]]
-    manager = TaskManager[list[float], ResultsCollector[list[float]]](
+    runner = TaskRunner[list[float], ResultsCollector[list[float]]](
         task_cls=DummyTask, handler_cls=result_handler, in_parallel=False
     )
-    return manager
+    return runner
 
 
-def test_task_generator(dummy_task_manager):
+def test_task_generator(dummy_task_runner):
     """
     Checks that the task generator works correctly based on batch size.
     """
     batch = list(range(10))
     batch_size = 3
     batches: list[tuple[int, list[float]]] = list(
-        dummy_task_manager.batch_gen(batch, batch_size)
+        dummy_task_runner.batch_gen(batch, batch_size)
     )
 
     assert len(batches) == 4
@@ -45,14 +45,14 @@ def test_task_generator(dummy_task_manager):
     assert batches[3][1] == [9]
 
 
-def test_task_generator_large_batch(dummy_task_manager):
+def test_task_generator_large_batch(dummy_task_runner):
     """
     Checks that only one batch is returned when batch > len(batch)
     """
     batch = list(range(10))  # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     batch_size = 100
     batches: list[tuple[int, list[float]]] = list(
-        dummy_task_manager.batch_gen(batch, batch_size)
+        dummy_task_runner.batch_gen(batch, batch_size)
     )
     assert len(batches) == 1
     assert batches[0][0] == 0

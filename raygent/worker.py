@@ -24,8 +24,8 @@ def ray_worker(
     the task's [`run_batch`][task.Task.run_batch] method with the provided batch
     of data. It serves as the core execution unit when using Ray.
 
-    While primarily used internally by [`TaskManager`][manager.TaskManager]'s
-    [`_submit_ray`][manager.TaskManager._submit_ray] method, it can be
+    While primarily used internally by [`TaskRunner`][runner.TaskRunner]'s
+    [`_submit_ray`][runner.TaskRunner._submit_ray] method, it can be
     called directly for custom Ray deployments if needed.
 
     Args:
@@ -43,12 +43,12 @@ def ray_worker(
             Typically this is a list of processed batch or results.
 
     Examples:
-        Basic usage through [`TaskManager`][manager.TaskManager] (recommended):
+        Basic usage through [`TaskRunner`][runner.TaskRunner] (recommended):
 
         ```python
-        # This is handled automatically by TaskManager when in_parallel=True
-        manager = TaskManager(MyTask, ResultsCollector, in_parallel=True)
-        manager.submit_tasks(batch)
+        # This is handled automatically by TaskRunner when in_parallel=True
+        runner = TaskRunner(MyTask, ResultsCollector, in_parallel=True)
+        runner.submit_tasks(batch)
         ```
 
         Direct usage (advanced):

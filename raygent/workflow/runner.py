@@ -71,10 +71,10 @@ class WorkflowRunner:
                 ):
                     batch_dict = partial.pop(key)
                     dst_node = self.graph.nodes[dst]
-                    manager = dst_node._resolve_manager()
+                    runner = dst_node._resolve_runner()
 
                     # Submit single‑batch workload (serial)
-                    handler = manager.submit_tasks(
+                    handler = runner.submit_tasks(
                         [batch_dict],  # one batch
                         batch_size=batch_size,
                         prebatched=True,

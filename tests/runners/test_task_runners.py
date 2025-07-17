@@ -1,4 +1,4 @@
-from raygent import Task, TaskManager
+from raygent import Task, TaskRunner
 from raygent.results.handlers import ResultsCollector
 
 
@@ -21,28 +21,28 @@ def _flatten_results(results):
 
 def test_submit_tasks_sequential():
     batch = [1.0, 2.0, 3.0, 4.0, 5.0]
-    task_manager: TaskManager[list[float], ResultsCollector[list[float]]] = TaskManager(
+    task_runner: TaskRunner[list[float], ResultsCollector[list[float]]] = TaskRunner(
         DummyTask, ResultsCollector, in_parallel=False
     )
 
-    handler = task_manager.submit_tasks(batch, batch_size=2)
+    handler = task_runner.submit_tasks(batch, batch_size=2)
     results = handler.get()
     flattened = _flatten_results(results)
     assert flattened == [2.0, 4.0, 6.0, 8.0, 10.0]
 
 
 def test_submit_tasks_parallel():
-    task_manager = TaskManager[list[float], ResultsCollector[list[float]]](
+    task_runner = TaskRunner[list[float], ResultsCollector[list[float]]](
         DummyTask, ResultsCollector, in_parallel=True
     )
-    task_manager.n_cores = 2
-    task_manager.n_cores_worker = 1
+    task_runner.n_cores = 2
+    task_runner.n_cores_worker = 1
 
     batch = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
-    handler = task_manager.submit_tasks(batch, batch_size=2)
+    handler = task_runner.submit_tasks(batch, batch_size=2)
 
     results = handler.get()
     flattened = _flatten_results(results)
 
-    assert task_manager.max_concurrent_tasks == 2
+    assert task_runner.max_concurrent_tasks == 2
     assert flattened == [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
