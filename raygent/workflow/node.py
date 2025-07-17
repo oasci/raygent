@@ -1,4 +1,4 @@
-from typing import Any, Generic, ParamSpec
+from typing import Any, Generic
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -8,8 +8,6 @@ from enum import Enum, auto
 from raygent import TaskRunner
 from raygent.dtypes import BatchType
 from raygent.results.handlers import HandlerType
-
-P = ParamSpec("P")
 
 
 class NodeStatus(Enum):
@@ -23,14 +21,14 @@ class NodeStatus(Enum):
 @dataclass(slots=True, kw_only=True)
 class RetryPolicy:
     max_retries: int = 0
-    backoff_seconds: float = 0.0  # linear for now
+    backoff_seconds: float = 0.0
     retry_exceptions: tuple[type[Exception], ...] = (Exception,)
 
 
 @dataclass(slots=True)
-class WorkflowNode(Generic[BatchType, HandlerType, P]):
+class WorkflowNode(Generic[BatchType, HandlerType]):
     """
-    A single vertex in a Workflow DAG.  Each node owns (or can lazily create)
+    A single vertex in a Workflow DAG. Each node owns (or can lazily create)
     one `TaskRunner` that performs the underlying work.
     """
 
