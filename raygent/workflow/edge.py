@@ -1,20 +1,16 @@
-from typing import Any, Callable, Generic, ParamSpec, TypeAlias, TypeVar, get_type_hints
+from typing import Callable, Generic, TypeVar, overload
 
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-UpOutT = TypeVar("UpOutT")  # upstream OutputType
-SelT = TypeVar("SelT")  # after selector
-DownInT = TypeVar("DownInT")  # final contribution to dst batch
+SourceT = TypeVar("SourceT")
+"""Type of the source node (i.e., upstream) output."""
 
-Selector: TypeAlias = Callable[[UpOutT], SelT]
-Transform: TypeAlias = Callable[[SelT], DownInT]
-
-P = ParamSpec("P")
+TailT = TypeVar("TailT")
+"""Type of the data the sink node (i.e., downstream) expects from the upstream node."""
 
 
 @dataclass(slots=True)
-class WorkflowEdge(Generic[UpOutT, SelT, DownInT]):
+class WorkflowEdge(Generic[SourceT, TailT]):
     """
     Directed, typed connection between two WorkflowNodes.
     """
@@ -28,48 +24,22 @@ class WorkflowEdge(Generic[UpOutT, SelT, DownInT]):
     dst_key: str
     """Name of data this edge provides to `dst`."""
 
-    selector: Selector | None = None
-    transform: Transform | None = None
+    transform: Callable[[SourceT], TailT] | None = None
+    """A function that transforms data from the source node to the tail node."""
+
     broadcast: bool = False
-    metadata: Mapping[str, Any] = field(default_factory=dict)
+    """If this edge broadcasts a constant value."""
 
-    def type_check(
-        self,
-        upstream_out_type: type[Any],
-        downstream_field_type: type[Any],
-    ) -> None:
-        """
-        Perform a static‑ish type compatibility check using annotations.
-        Raises TypeError on mismatch.
-        """
+    @overload
+    def apply(
+        self: "WorkflowEdge[SourceT, SourceT]", upstream_value: SourceT
+    ) -> SourceT: ...
 
-        # Helper to extract the -> return annotation
-        def ret_ann(callable_obj: Callable[..., Any]) -> Any:
-            return get_type_hints(callable_obj).get("return", Any)
+    @overload
+    def apply(self, upstream_value: SourceT) -> TailT: ...
 
-        sel_out = upstream_out_type
-        if self.selector:
-            sel_out = ret_ann(self.selector)
-
-        trans_out = sel_out
-        if self.transform:
-            trans_out = ret_ann(self.transform)
-
-        # Very pragmatic compatibility rule: exact match or Any or subclass.
-        if (
-            trans_out is not downstream_field_type
-            and downstream_field_type is not Any
-            and not issubclass(trans_out, downstream_field_type)
-        ):
-            raise TypeError(
-                f"Edge {self.src}->{self.dst!r} ({self.dst_key}) produces"
-                f" {trans_out}, but downstream expects {downstream_field_type}."
-            )
-
-    def apply(self, upstream_value: UpOutT) -> DownInT:
-        v: Any = upstream_value
-        if self.selector is not None:
-            v = self.selector(v)
+    def apply(self, upstream_value: SourceT) -> TailT | SourceT:
+        v = upstream_value
         if self.transform is not None:
-            v = self.transform(v)  # type: ignore[arg-type]
-        return v  # type: ignore[return-value]
+            v = self.transform(v)
+        return v
