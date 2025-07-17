@@ -1,12 +1,14 @@
-from typing import Generic
+from typing import Generic, ParamSpec
 
 from abc import ABC, abstractmethod
 
 from raygent.dtypes import BatchType, OutputType
 from raygent.results import IndexedResult
 
+P = ParamSpec("P")
 
-class Task(ABC, Generic[BatchType, OutputType]):
+
+class Task(ABC, Generic[BatchType, OutputType, P]):
     """Protocol for executing computational tasks on collections of data.
 
     The `Task` class provides a flexible framework for processing data items and
@@ -84,18 +86,18 @@ class Task(ABC, Generic[BatchType, OutputType]):
     def __init__(self) -> None:
         super().__init__()
 
-    def setup(self, *args: object, **kwargs: object) -> None:
+    def setup(self, *args: P.args, **kwargs: P.kwargs) -> None:
         """Optional setup method called once before processing begins."""
 
-    def teardown(self, *args: object, **kwargs: object) -> None:
+    def teardown(self, *args: P.args, **kwargs: P.kwargs) -> None:
         """Optional teardown method called once after all processing is complete."""
 
     def run_batch(
         self,
         index: int,
         batch: BatchType,
-        *args: object,
-        **kwargs: object,
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> IndexedResult[OutputType]:
         """This method serves as the primary entry point for
         [`TaskManager`][manager.TaskManager].
@@ -129,21 +131,21 @@ class Task(ABC, Generic[BatchType, OutputType]):
             results = handler.get()  # [1.0, 4.0, 6.0, 8.0, 10.0]
             ```
         """
-        self.setup(**kwargs)
+        self.setup(*args, **kwargs)
         result = IndexedResult[OutputType](value=None, index=index)
         output: OutputType | Exception = self.do(batch, *args, **kwargs)
         if not isinstance(output, Exception):
             result.value = output
 
-        self.teardown(**kwargs)
+        self.teardown(*args, **kwargs)
         return result
 
     @abstractmethod
     def do(
         self,
         batch: BatchType,
-        *args: object,
-        **kwargs: object,
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> OutputType | Exception:
         """Batch process data.
 

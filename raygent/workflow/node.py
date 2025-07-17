@@ -1,65 +1,78 @@
-from typing import Any
+from typing import Any, Callable, Generic, ParamSpec, TypeAlias
 
-from collections.abc import Callable, Iterable
-
-try:
-    import ray
-
-    has_ray = True
-except ImportError:
-    has_ray = False
-
-from loguru import logger
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum, auto
 
 from raygent import TaskManager
-from raygent.savers import Saver
+from raygent.dtypes import BatchType, OutputType
 
-TaskManagerFactory = Callable[[], TaskManager[Any, Any]]
-TaskManagerOrFactory = TaskManager[Any, Any] | TaskManagerFactory
+#: extra parameters that will be forwarded into TaskManager.submit_tasks(...)
+P = ParamSpec("P")
+
+TaskManagerFactory: TypeAlias = Callable[[], TaskManager[BatchType, OutputType]]
+TaskManagerOrFactory: TypeAlias = (
+    TaskManager[BatchType, OutputType] | TaskManagerFactory
+)
 
 
-class WorkflowTaskNode:
+class NodeStatus(Enum):  # replaces old TaskStatus
+    PENDING = auto()
+    RUNNING = auto()
+    COMPLETED = auto()
+    FAILED = auto()
+    SKIPPED = auto()
+
+
+@dataclass(slots=True, kw_only=True)
+class RetryPolicy:
+    max_retries: int = 0
+    backoff_seconds: float = 0.0  # linear for now
+    retry_exceptions: tuple[type[Exception], ...] = (Exception,)
+
+
+@dataclass(slots=True)
+class WorkflowNode(Generic[BatchType, OutputType, P]):
     """
-    Represents a single task node within the workflow graph.
-    Encapsulates task-specific configuration and state.
+    A single vertex in a Workflow DAG.  Each node owns (or can lazily create)
+    one `TaskManager` that performs the underlying work.
     """
 
-    def __init__(
-        self,
-        name: str,
-        manager_or_factory: TaskManagerOrFactory,
-        output_to_disk: bool = False,
-        output_saver: Saver | None = None,
-        output_chunk_size: int | None = None,
-        task_specific_kwargs_task: dict[str, Any] | None = None,
-        task_specific_kwargs_remote: dict[str, Any] | None = None,
-    ):
-        self.name: str = name
-        self.manager_or_factory: TaskManagerOrFactory = manager_or_factory
-        self.output_to_disk: bool = output_to_disk
-        self.output_saver: Saver | None = output_saver
-        self.output_chunk_size: int | None = output_chunk_size
-        self.task_specific_kwargs_task: dict[str, Any] = task_specific_kwargs_task or {}
-        self.task_specific_kwargs_remote: dict[str, Any] = (
-            task_specific_kwargs_remote or {}
-        )
+    # -------- static configuration ------------------------------------------
+    name: str
+    manager: TaskManagerOrFactory[BatchType, OutputType]
 
-        # Runtime state
-        self.status: str = "pending"  # pending, ready, running, completed, failed
-        self.error: str | None = None
-        # Using | for Union and ray.ObjectRef requires importing ray if available
-        self.results: "list[Any] | ray.ObjectRef | str | None" = None
-        self.input_data: "Iterable[Any] | ray.ObjectRef | None" = None
+    retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
+    kwargs_task: Mapping[str, Any] = field(default_factory=dict)
+    kwargs_remote: Mapping[str, Any] = field(default_factory=dict)
 
-    def get_task_manager_instance(self) -> TaskManager:
-        """Instantiate or return the TaskManager for this node."""
-        if callable(self.manager_or_factory):
-            return self.manager_or_factory()
-        return self.manager_or_factory
+    # -------- runtime state -------------------------------------------------
+    status: NodeStatus = field(init=False, default=NodeStatus.PENDING)
+    started_at: datetime | None = field(init=False, default=None)
+    finished_at: datetime | None = field(init=False, default=None)
+    duration: timedelta | None = field(init=False, default=None)
+    attempt: int = field(init=False, default=0)
+    error: Exception | None = field(init=False, default=None)
 
-    def update_status(self, status: str, error: str | None = None):
-        """Update the status of the task node."""
-        self.status = status
-        self.error = error
-        logger.debug(f"Task '{self.name}' status updated to: {status}")
+    results_ref: Any | None = field(init=False, default=None)
+    input_ref: Any | None = field(init=False, default=None)
 
+    # -------- helpers -------------------------------------------------------
+    def _resolve_manager(self) -> TaskManager[BatchType, OutputType]:
+        return self.manager() if callable(self.manager) else self.manager
+
+    # the workflow executor will call these:
+    def mark_started(self) -> None:
+        self.status, self.started_at = NodeStatus.RUNNING, datetime.now()
+
+    def mark_finished(self) -> None:
+        self.status = NodeStatus.COMPLETED
+        self.finished_at = datetime.now()
+        self.duration = self.finished_at - (self.started_at or self.finished_at)
+
+    def mark_failed(self, exc: Exception) -> None:
+        self.status = NodeStatus.FAILED
+        self.error = exc
+        self.finished_at = datetime.now()
+        self.duration = self.finished_at - (self.started_at or self.finished_at)
