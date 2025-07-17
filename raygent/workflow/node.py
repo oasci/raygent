@@ -1,4 +1,4 @@
-from typing import Any, Callable, Generic, ParamSpec, TypeAlias
+from typing import Any, Generic, ParamSpec
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -6,18 +6,13 @@ from datetime import datetime, timedelta
 from enum import Enum, auto
 
 from raygent import TaskManager
-from raygent.dtypes import BatchType, OutputType
+from raygent.dtypes import BatchType
+from raygent.results.handlers import HandlerType
 
-#: extra parameters that will be forwarded into TaskManager.submit_tasks(...)
 P = ParamSpec("P")
 
-TaskManagerFactory: TypeAlias = Callable[[], TaskManager[BatchType, OutputType]]
-TaskManagerOrFactory: TypeAlias = (
-    TaskManager[BatchType, OutputType] | TaskManagerFactory
-)
 
-
-class NodeStatus(Enum):  # replaces old TaskStatus
+class NodeStatus(Enum):
     PENDING = auto()
     RUNNING = auto()
     COMPLETED = auto()
@@ -33,21 +28,19 @@ class RetryPolicy:
 
 
 @dataclass(slots=True)
-class WorkflowNode(Generic[BatchType, OutputType, P]):
+class WorkflowNode(Generic[BatchType, HandlerType, P]):
     """
     A single vertex in a Workflow DAG.  Each node owns (or can lazily create)
     one `TaskManager` that performs the underlying work.
     """
 
-    # -------- static configuration ------------------------------------------
     name: str
-    manager: TaskManagerOrFactory[BatchType, OutputType]
+    manager: TaskManager[BatchType, HandlerType]
 
     retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
     kwargs_task: Mapping[str, Any] = field(default_factory=dict)
     kwargs_remote: Mapping[str, Any] = field(default_factory=dict)
 
-    # -------- runtime state -------------------------------------------------
     status: NodeStatus = field(init=False, default=NodeStatus.PENDING)
     started_at: datetime | None = field(init=False, default=None)
     finished_at: datetime | None = field(init=False, default=None)
@@ -58,11 +51,9 @@ class WorkflowNode(Generic[BatchType, OutputType, P]):
     results_ref: Any | None = field(init=False, default=None)
     input_ref: Any | None = field(init=False, default=None)
 
-    # -------- helpers -------------------------------------------------------
-    def _resolve_manager(self) -> TaskManager[BatchType, OutputType]:
-        return self.manager() if callable(self.manager) else self.manager
+    def _resolve_manager(self) -> TaskManager[BatchType, HandlerType]:
+        return self.manager
 
-    # the workflow executor will call these:
     def mark_started(self) -> None:
         self.status, self.started_at = NodeStatus.RUNNING, datetime.now()
 
