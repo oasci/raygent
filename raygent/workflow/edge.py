@@ -46,7 +46,7 @@ class WorkflowEdge(Generic[SourceT, TailT]):
 
     def type_check(
         self,
-        upstream_out_type: type[Any],
+        upstream_out_type: type[Any] | Any,
         dst_accepts_dict: bool,
     ) -> None:
         """

@@ -1,9 +1,15 @@
 from types import MappingProxyType
+from typing import Any, get_origin
 
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 
 from raygent.workflow import WorkflowEdge, WorkflowNode
+
+WorkflowNodeAny = WorkflowNode[Any, Any]
+WorkflowEdgeAny = WorkflowEdge[Any, Any]
+
+_DICT_OR_MAPPING = (dict, Mapping)
 
 
 @dataclass(slots=True)
@@ -12,8 +18,8 @@ class WorkflowGraph:
     Pure, validated DAG: nodes + edges + typing constraints.
     """
 
-    nodes: Mapping[str, WorkflowNode]
-    edges: Sequence[WorkflowEdge]
+    nodes: Mapping[str, WorkflowNodeAny]
+    edges: Sequence[WorkflowEdgeAny]
 
     def __post_init__(self) -> None:
         # Freeze mapping so external callers can’t mutate after validation
@@ -28,15 +34,15 @@ class WorkflowGraph:
     @classmethod
     def from_iterables(
         cls,
-        nodes: Iterable[WorkflowNode],
-        edges: Iterable[WorkflowEdge],
+        nodes: Iterable[WorkflowNodeAny],
+        edges: Iterable[WorkflowEdgeAny],
     ) -> "WorkflowGraph":
         return cls({n.name: n for n in nodes}, list(edges))
 
-    def parents(self, node: str) -> Sequence[WorkflowEdge]:
+    def parents(self, node: str) -> Sequence[WorkflowNodeAny]:
         return [e for e in self.edges if e.dst == node]
 
-    def children(self, node: str) -> Sequence[WorkflowEdge]:
+    def children(self, node: str) -> Sequence[WorkflowEdgeAny]:
         return [e for e in self.edges if e.src == node]
 
     def sources(self) -> Sequence[str]:
@@ -89,17 +95,17 @@ class WorkflowGraph:
             src_node = self.nodes[edge.src]
             dst_node = self.nodes[edge.dst]
 
-            # --- infer upstream output type ---------------------------- #
-            tm = src_node._resolve_runner()
-            upstream_out_type: type[Any] = getattr(
+            # Infer upstream output type
+            tm = src_node.resolve_runner()
+            upstream_out_type = getattr(
                 tm,
                 "output_type",
                 Any,  # fallback; you can refine TaskRunner
             )
 
-            # --- confirm downstream accepts dict[str, Any] ------------- #
-            tm_down = dst_node._resolve_runner()
-            downstream_input_type: type[Any] = getattr(tm_down, "input_type", Mapping)
+            # Confirm downstream accepts dict[str, Any]
+            tm_down = dst_node.resolve_runner()
+            downstream_input_type = getattr(tm_down, "input_type", Mapping)
             downstream_is_dict = (
                 downstream_input_type in _DICT_OR_MAPPING
                 or get_origin(downstream_input_type) in _DICT_OR_MAPPING

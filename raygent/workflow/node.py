@@ -49,7 +49,11 @@ class WorkflowNode(Generic[BatchType, HandlerType]):
     results_ref: Any | None = field(init=False, default=None)
     input_ref: Any | None = field(init=False, default=None)
 
-    def _resolve_runner(self) -> TaskRunner[BatchType, HandlerType]:
+    def resolve_runner(self) -> TaskRunner[BatchType, HandlerType]:
+        """Return the underlying runner.
+
+        This is often used when validating types for edges.
+        """
         return self.runner
 
     def mark_started(self) -> None:
