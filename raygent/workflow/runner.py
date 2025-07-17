@@ -39,15 +39,15 @@ class WorkflowRunner:
         ctrs = {src: itertools.count() for src in self.graph.sources()}
 
         # Prime source envelopes
-        inbox: deque[tuple[str, BatchEnvelope[Any]]] = deque()
+        inbox: deque[tuple[str, BatchEnvelope[Any] | None]] = deque()
         for src, iterable in sources.items():
             for ordinal, batch in zip(range(10_000_000), iterable):
                 env = BatchEnvelope(batch_id=(src, ordinal), data=batch)
                 inbox.append((src, env))
             # signal done with sentinel (None)
-            inbox.append((src, None))  # type: ignore[arg-type]
+            inbox.append((src, None))
 
-        # Main loop ----------------------------------------------------- #
+        # Main loop
         while inbox:
             src_name, envelope = inbox.popleft()
             if envelope is None:
