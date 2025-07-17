@@ -1,4 +1,4 @@
-from typing import Callable, Generic, TypeVar, overload
+from typing import Any, Callable, Generic, TypeVar, get_type_hints, overload
 
 from dataclasses import dataclass
 
@@ -43,3 +43,24 @@ class WorkflowEdge(Generic[SourceT, TailT]):
         if self.transform is not None:
             v = self.transform(v)
         return v
+
+    def type_check(
+        self,
+        upstream_out_type: type[Any],
+        dst_accepts_dict: bool,
+    ) -> None:
+        """
+        Raises TypeError if selector/transform annotations conflict with
+        declared upstream / downstream types.
+        """
+        from typing import Any as _Any  # avoid collision
+
+        def ret(obj: Callable[..., Any]) -> Any:
+            return get_type_hints(obj).get("return", _Any)
+
+        trans_out = ret(self.transform) if self.transform else upstream_out_type
+
+        if not dst_accepts_dict and trans_out is not _Any:
+            raise TypeError(
+                f"Edge {self.src}->{self.dst} produces {trans_out!r}, but downstream node does not accept dict batches."
+            )
