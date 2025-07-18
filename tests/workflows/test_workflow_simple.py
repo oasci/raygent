@@ -1,10 +1,10 @@
 from typing import override
 
 import pytest
-import ray
 
 from raygent.batch import batch_generator
 from raygent.results import BatchMessage
+from raygent.results.handlers import ResultsCollector
 from raygent.task import Task
 from raygent.workflow import DAG
 
@@ -77,7 +77,7 @@ def test_multi_node_dag_pipeline_add():
     sq2, source_2 = dag.add_source(SquareTask(), 1)
 
     comb = dag.add(_CombineTask(), inputs=(sq1, sq2))
-    summed, sink_1 = dag.add_sink(SumTask(), inputs=(comb,))
+    summed, sink_1 = dag.add_sink(SumTask(), inputs=(comb,), handler=ResultsCollector())
     dag.run()
 
     list1 = [1, 2, 3, 4]
@@ -93,3 +93,5 @@ def test_multi_node_dag_pipeline_add():
         msg = sink_1.get(timeout=5)
         assert msg.index == idx
         assert expected[idx] == msg.payload
+    
+    # TODO: Need to implement way to get handler from summed.

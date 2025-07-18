@@ -6,8 +6,8 @@ from collections.abc import Iterable, Sequence
 
 import ray
 
+from raygent.results.handlers.handler import ResultsHandler
 from raygent.workflow import BoundedQueue, NodeHandle, TaskActor
-from raygent.workflow.queue import BoundedQueue
 
 if TYPE_CHECKING:
     from ray.actor import ActorHandle
@@ -46,6 +46,7 @@ class DAG:
         *,
         inputs: Iterable[NodeHandle[Any]] | None = None,
         name: str | None = None,
+        handler: ResultsHandler[Any] | None = None,
         queue_size: int | None = None,
     ) -> NodeHandle[Any]:
         """Instantiate *task* as a `TaskActor` and connect it to *inputs*.
@@ -80,6 +81,8 @@ class DAG:
             actor.register_input.remote(q)
             inbound_queues.append(q)
 
+        if handler:
+            actor.register_handler.remote(handler)
         handle = NodeHandle(actor=actor)
         key = name or f"{task.__class__.__name__}-{handle.uid}"
         if key in self._nodes:
@@ -96,6 +99,7 @@ class DAG:
         /,
         *,
         name: str | None = None,
+        handler: ResultsHandler[Any] | None = None,
         queue_size: int | None = None,
     ) -> tuple[NodeHandle[T], BoundedQueue[T]]: ...
 
@@ -107,6 +111,7 @@ class DAG:
         /,
         *,
         name: str | None = None,
+        handler: ResultsHandler[Any] | None = None,
         queue_size: int | None = None,
     ) -> tuple[NodeHandle[T], list[BoundedQueue[T]]]: ...
 
@@ -117,6 +122,7 @@ class DAG:
         /,
         *,
         name: str | None = None,
+        handler: ResultsHandler[Any] | None = None,
         queue_size: int | None = None,
     ) -> tuple[NodeHandle[T], BoundedQueue[T] | list[BoundedQueue[T]]]:
         """Add a *root* operator and hand back its inbound queue.
@@ -129,6 +135,8 @@ class DAG:
         for source in sources:
             actor.register_input.remote(source)
 
+        if handler:
+            actor.register_handler.remote(handler)
         handle = NodeHandle[T](actor=actor, inputs=sources)
         key = name or f"{task.__class__.__name__}-{handle.uid}"
         if key in self._nodes:
@@ -145,6 +153,7 @@ class DAG:
         *,
         inputs: Iterable[NodeHandle[Any]] | None = None,
         name: str | None = None,
+        handler: ResultsHandler[Any] | None = None,
         queue_size: int | None = None,
     ) -> tuple[NodeHandle[Any], BoundedQueue[Any]]:
         """Instantiate *task* as a `TaskActor` and connect it to *inputs*.
@@ -181,6 +190,8 @@ class DAG:
         sink_queue: BoundedQueue[Any] = BoundedQueue[Any](qsize)
         actor.register_output.remote(sink_queue)
 
+        if handler:
+            actor.register_handler.remote(handler)
         handle = NodeHandle(actor=actor)
         key = name or f"{task.__class__.__name__}-{handle.uid}"
         if key in self._nodes:

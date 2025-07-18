@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 import ray
 
 from raygent.results import BatchMessage, IndexedResult
+from raygent.results.handlers.handler import ResultsHandler
 from raygent.workflow import BoundedQueue
 
 if TYPE_CHECKING:
@@ -70,6 +71,9 @@ class TaskActor[T]:
                 )
 
             self.next_index += 1
+
+    def get_handler(self) -> ResultsHandler[T] | None:
+        return self.handler
 
 
 @dataclass(slots=True, kw_only=True)
