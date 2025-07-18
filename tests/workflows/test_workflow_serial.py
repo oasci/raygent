@@ -15,13 +15,15 @@ from raygent.workflow.runners import WorkflowRunner
 class SquareTask(Task[list[int]]):
     @override
     def do(self, batch: list[int]) -> list[int]:
-        return [x * x for x in batch]
+        result = [x * x for x in batch]
+        return result
 
 
 class PrefactorTask(Task[list[int]]):
     @override
     def do(self, batch: list[int], factor: int = 2) -> list[int]:
-        return [factor * x for x in batch]
+        result = [factor * x for x in batch]
+        return result
 
 
 class SumTask(Task[list[int]]):
@@ -69,9 +71,9 @@ def test_linear_pipeline():
 
     graph = WorkflowGraph.from_iterables([node_src, node_double, node_sink], edges)
     runner = WorkflowRunner(graph, parallel=False, default_concurrency=2)
-    outs = runner.run({"src": [1, 2]}, batch_size=1)
+    outs = runner.run({"src": [[1, 7]]}, batch_size=1)
 
-    assert outs["sink"] == [[4], [16]]  # (square -> double) twice
+    assert outs["sink"] == [[4], [196]]  # square -> double -> square
 
 
 def test_fan_in_selector_transform(range_batches):

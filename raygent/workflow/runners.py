@@ -88,14 +88,16 @@ class WorkflowRunner:
             n: _NodeRunner(node, default_concurrency) for n, node in graph.nodes.items()
         }
 
-        # In-flight futures → (node_name, batch_id)
+        # In-flight futures -> (node_name, batch_id)
         self._fut2info: dict[Future, tuple[str, tuple[str, int]]] = {}
 
         # Buffers for assembling downstream batches
-        # key: (dst_node_name, batch_id) → partial dict
+        # key: (dst_node_name, batch_id) -> partial dict
         self._partial: dict[tuple[str, tuple[str, int]], dict[str, dict]] = defaultdict(
-            lambda: {"pos": {}, "kw": {}}
+            lambda: {"pos": {}}
         )
+
+        self._retry_payloads = {}
 
     def run(
         self,
@@ -107,11 +109,11 @@ class WorkflowRunner:
         Drive the workflow until all sink nodes complete.
 
         Args:
-            sources: Mapping *source_node_name* → iterable/generator of raw data items.
+            sources: Mapping *source_node_name* -> iterable/generator of raw data items.
             batch_size: Logical size used when chopping source iterables into batches.
         """
         with get_executor(self.parallel, self.max_workers) as executor:
-            # Prime source nodes
+            logger.debug("Setting up source nodes")
             names = list(sources.keys())
             iterables = tuple(sources[n] for n in names)
             for ordinal, slices in batch_generator(iterables, batch_size=batch_size):
@@ -157,6 +159,7 @@ class WorkflowRunner:
         executor: Executor,
     ) -> None:
         """Feed *result* down every outgoing edge."""
+        logger.debug("Checking for all edge results for {}", src_name)
         for edge in self.graph.children(src_name):
             dst_batch_id = batch_id if not edge.broadcast else (edge.dst, -1)
             key = (edge.dst, dst_batch_id)
@@ -169,9 +172,12 @@ class WorkflowRunner:
             want_pos = self.graph.input_pos(edge.dst)
 
             if got_pos == want_pos:
+                logger.debug("Have all args for {}", edge.dst)
                 payload = [self._partial[key]["pos"][i] for i in sorted(want_pos)]
                 self._partial.pop(key)
                 self._submit_to_node(edge.dst, dst_batch_id, payload, executor)
+            else:
+                logger.debug("{} is waiting for {}", edge.dst, want_pos ^ got_pos)
 
     def _submit_to_node(
         self,
@@ -185,9 +191,6 @@ class WorkflowRunner:
             self._collect_next_done(executor)
         fut = runner.submit(payload, executor)
         self._fut2info[fut] = (node_name, batch_id)
-        # remember the payload so we can retry *this* batch only
-        if not hasattr(self, "_retry_payloads"):
-            self._retry_payloads = {}
         self._retry_payloads[(node_name, batch_id)] = payload
 
     def _propagate_from_source(
@@ -198,5 +201,8 @@ class WorkflowRunner:
         executor: Executor,
     ) -> None:
         """Initial injection from a source iterable."""
+        logger.debug(
+            "Injecting node {} with batch {} containing ", src_name, batch_id, payload
+        )
         self._propagate(src_name, batch_id, payload, executor)
         self._submit_to_node(src_name, batch_id, payload, executor)
