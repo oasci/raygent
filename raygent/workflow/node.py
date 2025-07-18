@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any, override, TypeVar
 
 import uuid
 from dataclasses import dataclass, field
@@ -13,6 +13,8 @@ from raygent.workflow import BoundedQueue
 if TYPE_CHECKING:
     from raygent import Task
     from raygent.results.handlers import ResultsHandler
+
+T = TypeVar("T")
 
 
 @ray.remote
