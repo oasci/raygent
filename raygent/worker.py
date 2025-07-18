@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ParamSpec, TypeVar
 
 import ray
 
@@ -6,17 +6,17 @@ if TYPE_CHECKING:
     from raygent import Task
     from raygent.results import IndexedResult
 
-from raygent.dtypes import BatchType, OutputType
+P = ParamSpec("P")
+T = TypeVar("T")
 
 
 @ray.remote
-def ray_worker(
-    task_cls: "type[Task[BatchType, OutputType]]",
+def ray_worker[**P](
+    task_cls: "type[Task[P, T]]",
     index: int,
-    batch: BatchType,
-    *args: object,
-    **kwargs: object,
-) -> "IndexedResult[OutputType]":
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> "IndexedResult[T]":
     """
     Remote Ray worker function that processes tasks in parallel.
 
@@ -89,5 +89,5 @@ def ray_worker(
         This function is decorated with `@ray.remote`, making it a Ray remote function
         that can be executed on any worker in the Ray cluster.
     """
-    task: "Task[BatchType, OutputType]" = task_cls()
-    return task.run_batch(index, batch, *args, **kwargs)
+    task: "Task[P, T]" = task_cls()
+    return task.run_batch(index, *args, **kwargs)

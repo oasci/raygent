@@ -1,11 +1,14 @@
+from typing import override
+
 from raygent import Task, TaskRunner
 from raygent.results.handlers import ResultsCollector
 
 
-class DummyTask(Task[list[float], list[float]]):
+class DummyTask(Task[[list[float]], list[float]]):
     """A dummy task that doubles the input."""
 
-    def do(self, batch: list[float], *args: object, **kwargs: object) -> list[float]:
+    @override
+    def do(self, batch: list[float]) -> list[float]:
         return [item * 2 for item in batch]
 
 
@@ -21,7 +24,7 @@ def _flatten_results(results):
 
 def test_submit_tasks_sequential():
     batch = [1.0, 2.0, 3.0, 4.0, 5.0]
-    task_runner: TaskRunner[list[float], ResultsCollector[list[float]]] = TaskRunner(
+    task_runner: TaskRunner[[list[float]], list[float]] = TaskRunner(
         DummyTask, ResultsCollector, in_parallel=False
     )
 
@@ -32,7 +35,7 @@ def test_submit_tasks_sequential():
 
 
 def test_submit_tasks_parallel():
-    task_runner = TaskRunner[list[float], ResultsCollector[list[float]]](
+    task_runner = TaskRunner[[list[float]], list[float]](
         DummyTask, ResultsCollector, in_parallel=True
     )
     task_runner.n_cores = 2

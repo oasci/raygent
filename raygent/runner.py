@@ -1,7 +1,6 @@
-from typing import TYPE_CHECKING, Generic
+from typing import TYPE_CHECKING, Any, Generic, ParamSpec, TypeVar, Unpack
 
-from collections.abc import Generator, Mapping
-from itertools import islice
+from collections.abc import Generator, Iterable, Mapping
 
 try:
     import ray
@@ -13,14 +12,17 @@ except ImportError:
     has_ray = False
 from loguru import logger
 
-from raygent.dtypes import BatchType, OutputType
-from raygent.results.handlers import HandlerType
+from raygent.batch import Ts, batch_generator
+from raygent.results.handlers import ResultsHandler
 
 if TYPE_CHECKING:
     from raygent import Task
 
+P = ParamSpec("P")
+T = TypeVar("T")
 
-class TaskRunner(Generic[BatchType, HandlerType]):
+
+class TaskRunner(Generic[P, T]):
     """
     A runner class for handling task submissions and result handling using serial
     or parallel computation.
@@ -28,8 +30,8 @@ class TaskRunner(Generic[BatchType, HandlerType]):
 
     def __init__(
         self,
-        task_cls: "type[Task[BatchType, OutputType]]",
-        handler_cls: type[HandlerType],
+        task_cls: "type[Task[P, T]]",
+        handler_cls: type[ResultsHandler[T]],
         n_cores: int = -1,
         in_parallel: bool = False,
         n_cores_worker: int = 1,
@@ -46,12 +48,12 @@ class TaskRunner(Generic[BatchType, HandlerType]):
                 `in_parallel` is `True`.
         """
 
-        self.task_cls: "type[Task[BatchType, OutputType]]" = task_cls
+        self.task_cls: "type[Task[P, T]]" = task_cls
         """
         A class that follows the [`Task`][task.Task] protocol.
         """
 
-        self.handler_cls: type[HandlerType] = handler_cls
+        self.handler_cls: type[ResultsHandler[T]] = handler_cls
         """
         Class that collects, processes, and handles all
         [`Result`][results.result.Result]s after calling
@@ -59,7 +61,7 @@ class TaskRunner(Generic[BatchType, HandlerType]):
         [`ResultsCollector`][results.handlers.collector.ResultsCollector].
         """
 
-        self.handler: HandlerType = self.handler_cls()
+        self.handler: ResultsHandler[T] = self.handler_cls()
 
         assert isinstance(in_parallel, bool), "in_parallel must be a bool"
         if in_parallel is True and not has_ray:
@@ -204,51 +206,16 @@ class TaskRunner(Generic[BatchType, HandlerType]):
         logger.debug(f"Maximum number of concurrent tasks: {n_tasks}")
         return n_tasks
 
-    def batch_gen(
-        self,
-        data: BatchType,
-        batch_size: int,
-        prebatched: bool = False,
-    ) -> Generator[tuple[int, BatchType], None, None]:
-        """
-        Splits data into batches and yields each for processing.
-
-        Args:
-            data: Data to process.
-            batch_size: The number of items to include in each batch. If the total
-                number of items is not evenly divisible by `batch_size`, the final
-                batch will contain the remaining items.
-            prebatched: `data` is already an iterable of batches.
-
-        Yields:
-            Unique `int` specifying the order of the batch.
-
-            Batch of `data` containing up to `batch_size` elements.
-        """
-        assert batch_size > 0, "chunk_size must be positive"
-
-        if prebatched:
-            for idx, batch in enumerate(data):
-                yield idx, batch
-            return
-
-        it = iter(data)
-        for idx in range(1_000_000_000):
-            batch = list(islice(it, batch_size))
-            if not batch:
-                break
-            yield idx, batch
-
     def submit_tasks(
         self,
-        data: BatchType,
+        *data_streams: Unpack[tuple[Iterable[Any]]],
         batch_size: int = 10,
         prebatched: bool = False,
         args_task: tuple[object] | None = None,
         kwargs_task: Mapping[str, object] | None = None,
         args_remote: tuple[object] | None = None,
         kwargs_remote: Mapping[str, object] | None = None,
-    ) -> HandlerType:
+    ) -> ResultsHandler[T]:
         """Submits and processes tasks in serial or parallel mode.
 
         This method is the primary entrypoint for task execution in the `TaskRunner`.
@@ -311,7 +278,9 @@ class TaskRunner(Generic[BatchType, HandlerType]):
         self.handler = self.handler_cls()
 
         logger.info(f"Submitting tasks with batch_size of {batch_size}")
-        batch_gen = self.batch_gen(data, batch_size, prebatched)
+        batch_gen = batch_generator(
+            *data_streams, batch_size=batch_size, prebatched=prebatched
+        )
 
         if self.in_parallel:
             self._submit_ray(
@@ -325,7 +294,7 @@ class TaskRunner(Generic[BatchType, HandlerType]):
 
     def _submit(
         self,
-        batch_gen: Generator[tuple[int, BatchType]],
+        batch_gen: Generator[tuple[int, tuple[*Ts]], None, None],
         args_task: tuple[object] | None = None,
         kwargs_task: Mapping[str, object] | None = None,
     ) -> None:
@@ -352,16 +321,17 @@ class TaskRunner(Generic[BatchType, HandlerType]):
         if kwargs_task is None:
             kwargs_task = {}
         logger.debug("Running tasks in serial")
-        for index, batch in batch_gen:
-            results_batch = self.task_cls().run_batch(
-                index, batch, *args_task, **kwargs_task
+        for index, batch_item_args in batch_gen:
+            task_instance = self.task_cls()
+            results_batch = task_instance.run_batch(
+                index, *batch_item_args, *args_task, **kwargs_task
             )
             self.handler.add_result(results_batch)
             self.handler.save()
 
     def _submit_ray(
         self,
-        batch_gen: Generator[tuple[int, BatchType]],
+        batch_gen: Generator[tuple[int, tuple[*Ts]], None, None],
         args_task: tuple[object] | None = None,
         kwargs_task: Mapping[str, object] | None = None,
         args_remote: tuple[object] | None = None,
@@ -419,7 +389,7 @@ class TaskRunner(Generic[BatchType, HandlerType]):
             self.n_cores = n_cores
 
         # Submit tasks and process completed ones as we go.
-        for index, batch in batch_gen:
+        for index, batch_item_args in batch_gen:
             # If the maximum concurrency is reached, wait for one task to finish.
             if len(self.futures) >= self.max_concurrent_tasks:
                 done_futures, self.futures = ray.wait(self.futures, num_returns=1)
@@ -428,10 +398,10 @@ class TaskRunner(Generic[BatchType, HandlerType]):
                 self.handler.add_result(result)
 
             # Submit a new task to Ray.
-            logger.debug(f"Submitting Ray task which index of {batch[0]}")
+            logger.debug(f"Submitting Ray task which index of {index}")
             future = ray_worker.options(
                 num_cpus=self.n_cores_worker, *args_remote, **kwargs_remote
-            ).remote(self.task_cls, index, batch, *args_task, **kwargs_task)
+            ).remote(self.task_cls, index, *batch_item_args, *args_task, **kwargs_task)
             self.futures.append(future)
 
         # Process any remaining futures.
@@ -441,7 +411,7 @@ class TaskRunner(Generic[BatchType, HandlerType]):
             result = ray.get(finished_future)
             self.handler.add_result(result)
 
-    def get_handler(self) -> HandlerType:
+    def get_handler(self) -> ResultsHandler[T]:
         """Returns the `ResultsHandler`.
 
         Returns:
