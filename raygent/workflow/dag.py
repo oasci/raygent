@@ -1,13 +1,13 @@
 """Minimalist DAG builder for deterministic, batch-synchronous stream processing."""
 
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload, override
+from typing import TYPE_CHECKING, TypeVar, override
 
 from collections.abc import Iterable, Sequence
 
 import ray
 
-from raygent.results.handlers.handler import ResultsHandler
 from raygent.workflow import BoundedQueue, NodeHandle, TaskActor
+from raygent.workflow.helpers import IdentityTask
 
 if TYPE_CHECKING:
     from ray.actor import ActorHandle
@@ -44,7 +44,7 @@ class DAG:
         task: "Task",
         /,
         *,
-        inputs: Iterable[NodeHandle] | None = None,
+        inputs: Iterable[NodeHandle],
         name: str | None = None,
         queue_size: int | None = None,
     ) -> NodeHandle:
@@ -87,72 +87,41 @@ class DAG:
 
         return handle
 
-    @overload
     def add_source(
         self,
-        task: "Task",
-        n_sources: Literal[1],
         /,
         *,
         name: str | None = None,
-        handler: ResultsHandler[Any] | None = None,
         queue_size: int | None = None,
-    ) -> tuple[NodeHandle, BoundedQueue]: ...
-
-    @overload
-    def add_source(
-        self,
-        task: "Task",
-        n_sources: int,
-        /,
-        *,
-        name: str | None = None,
-        handler: ResultsHandler[Any] | None = None,
-        queue_size: int | None = None,
-    ) -> tuple[NodeHandle, list[BoundedQueue]]: ...
-
-    def add_source(
-        self,
-        task: "Task",
-        n_sources: int,
-        /,
-        *,
-        name: str | None = None,
-        handler: ResultsHandler[Any] | None = None,
-        queue_size: int | None = None,
-    ) -> tuple[NodeHandle, BoundedQueue | list[BoundedQueue]]:
+    ) -> tuple[NodeHandle, BoundedQueue]:
         """Add a *root* operator and hand back its inbound queue.
 
         Returns (handle, queue) so you can `queue.put(...)` from the driver.
         """
+        task = IdentityTask()
         qsize = queue_size or self._default_qsize
-        actor = TaskActor.remote(task, n_sources)
-        sources = [BoundedQueue(qsize) for _ in range(n_sources)]
-        for source in sources:
-            actor.register_input.remote(source)
+        actor = TaskActor.remote(task, 1)
 
-        if handler:
-            actor.register_handler.remote(handler)
-        handle = NodeHandle(actor=actor, inputs=sources)
+        source = BoundedQueue(qsize)
+        actor.register_input.remote(source)
+
+        handle = NodeHandle(actor=actor, inputs=[source])
         key = name or f"{task.__class__.__name__}-{handle.uid}"
         if key in self._nodes:
             raise ValueError(f"Duplicate node name: {key!r}")
         self._nodes[key] = handle
-        if len(sources) == 1:
-            sources = sources[0]
-        return handle, sources
+
+        return handle, source
 
     def add_sink(
         self,
-        task: "Task",
+        inputs: Iterable[NodeHandle],
         /,
         *,
-        inputs: Iterable[NodeHandle] | None = None,
         name: str | None = None,
-        handler: ResultsHandler[Any] | None = None,
         queue_size: int | None = None,
     ) -> tuple[NodeHandle, BoundedQueue]:
-        """Instantiate *task* as a `TaskActor` and connect it to *inputs*.
+        """Create a sink where data can be retrieved.
 
         Args:
             task: An implementation of your [`Task`]task.Task] API.
@@ -170,6 +139,7 @@ class DAG:
         if self._started:
             raise RuntimeError("Cannot add nodes after DAG has been started")
 
+        task = IdentityTask()
         parents: list[NodeHandle] = list(inputs or [])
         n_inputs: int = len(parents)
         actor = TaskActor.remote(task, n_inputs)
@@ -186,8 +156,6 @@ class DAG:
         sink_queue: BoundedQueue = BoundedQueue(qsize)
         actor.register_output.remote(sink_queue)
 
-        if handler:
-            actor.register_handler.remote(handler)
         handle = NodeHandle(actor=actor)
         key = name or f"{task.__class__.__name__}-{handle.uid}"
         if key in self._nodes:

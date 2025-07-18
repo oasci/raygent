@@ -69,11 +69,16 @@ def test_multi_node_dag_pipeline():
     """
 
     dag = DAG()
-    sq1, source_1 = dag.add_source(SquareTask(), 1)
-    sq2, source_2 = dag.add_source(SquareTask(), 1)
 
-    comb = dag.add(_CombineTask(), inputs=(sq1, sq2))
-    summed, sink_1 = dag.add_sink(SumTask(), inputs=(comb,))
+    source_1, q_1 = dag.add_source()
+    source_2, q_2 = dag.add_source()
+
+    sq_1 = dag.add(SquareTask(), inputs=(source_1,))
+    sq_2 = dag.add(SquareTask(), inputs=(source_2,))
+
+    comb = dag.add(_CombineTask(), inputs=(sq_1, sq_2))
+    summed = dag.add(SumTask(), inputs=(comb,))
+    sink_1 = dag.add_sink((summed,))
     dag.run()
 
     list1 = [1, 2, 3, 4]
@@ -81,8 +86,8 @@ def test_multi_node_dag_pipeline():
     batch_gen = batch_generator((list1, list2), batch_size=2)
 
     for index, payloads in batch_gen:
-        source_1.put(BatchMessage(index=index, payload=payloads[0]))
-        source_2.put(BatchMessage(index=index, payload=payloads[1]))
+        q_1.put(BatchMessage(index=index, payload=payloads[0]))
+        q_2.put(BatchMessage(index=index, payload=payloads[1]))
 
     expected = [[26, 40], [58, 80]]
     for idx in range(2):
