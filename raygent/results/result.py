@@ -6,6 +6,12 @@ T = TypeVar("T")
 
 
 @dataclass
+class BatchMessage(Generic[T]):
+    index: int
+    payload: T
+
+
+@dataclass
 class Result(Generic[T]):
     value: T | None
     """Computed values returned by [`do()`][task.Task.do]."""

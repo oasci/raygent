@@ -1,6 +1,5 @@
-from .node import WorkflowNode
-from .edge import WorkflowEdge
-from .graph import WorkflowGraph
-from .runners import WorkflowRunner
+from .queue import BoundedQueue
+from .node import NodeHandle, TaskActor
+from .dag import DAG
 
-__all__ = ["WorkflowNode", "WorkflowEdge", "WorkflowGraph", "WorkflowRunner"]
+__all__ = ["BoundedQueue", "NodeHandle", "TaskActor", "DAG"]

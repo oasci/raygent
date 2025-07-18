@@ -86,49 +86,6 @@ class Task(ABC, Generic[T]):
     def __init__(self) -> None:
         super().__init__()
 
-    def run_batch(
-        self,
-        index: int,
-        *args: Any,
-        **kwargs: Any,
-    ) -> IndexedResult[T]:
-        """This method serves as the primary entry point for
-        [`TaskRunner`][runner.TaskRunner].
-
-        Args:
-            index: A unique integer used to specify ordering for
-                [`Result.index`][results.Result.index].
-            *args: Positional arguments pass to
-                [`startup`][task.Task.startup],
-                [`do`][task.Task.do], and
-                [`teardown`][task.Task.teardown].
-            **kwargs: Additional keyword arguments passed to
-                [`startup`][task.Task.startup],
-                [`do`][task.Task.do], and
-                [`teardown`][task.Task.teardown].
-
-        Returns:
-            [`IndexedResult`][results.result.IndexedResult] of processing all data in
-                `batch`.
-
-        Example:
-            ```python
-            class NumberSquarerTask(Task[float, float]):
-                def do(self, items):
-                    return [i**2 for i in items]
-
-
-            task = NumberSquarerTask()
-            handler = task.run_batch(0, [1.0, 2.0, 3.0, 4.0, 5.0])
-            results = handler.get()  # [1.0, 4.0, 6.0, 8.0, 10.0]
-            ```
-        """
-        result = IndexedResult[T](value=None, index=index)
-        output: T | Exception = self.do(*args, **kwargs)
-        if not isinstance(output, Exception):
-            result.value = output
-        return result
-
     @abstractmethod
     def do(
         self,
