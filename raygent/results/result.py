@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from dataclasses import dataclass
 
@@ -6,9 +6,9 @@ T = TypeVar("T")
 
 
 @dataclass
-class BatchMessage(Generic[T]):
+class BatchMessage:
     index: int
-    payload: T
+    payload: Any
 
 
 @dataclass

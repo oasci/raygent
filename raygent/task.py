@@ -1,46 +1,13 @@
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from abc import ABC, abstractmethod
 
-from raygent.results import IndexedResult
 
-T = TypeVar("T")
-
-
-class Task(ABC, Generic[T]):
+class Task(ABC):
     """Protocol for executing computational tasks on collections of data.
 
     The `Task` class provides a flexible framework for processing data items and
     serves as the core computational unit in the `raygent` framework.
-
-    **Types**
-
-    To write a new [`Task`][task.Task], you need to first understand what your
-    ParamSpecs and [`T`][dtypes.T] will be.
-    ParamSpecs specify what positional and keyword arguments all methods will receive.
-
-    Note that [`do`][task.Task.do] assumes a batch of multiple
-    values will be provided. If your task is to square numbers, then you would provide
-    something like:
-
-    ```python
-    SquareTask(Task[[list[float]], list[float]):
-    ```
-
-    If your task squeezes the data into a scalar (e.g., taking the sum), then you
-    would specify the following.
-
-    ```python
-    SumTask(Task[[list[float]], float]):
-    ```
-    Performing operations on NumPy arrays are specified the same way, except now
-    we get arrays for `InputType` and `T`.
-
-    ```python
-    SquareTask(Task[npt.NDArray[np.float64], npt.NDArray[np.float64]):
-    ```
-
-    **Implementation**
 
     The only required implementation is [`do`][task.Task.do]
     which specifies how to process a batch of items. For example, writing a
@@ -52,7 +19,8 @@ class Task(ABC, Generic[T]):
     import numpy as np
     import numpy.typing as npt
 
-    class MeanTask(Task[npt.NDArray[np.float64], npt.NDArray[np.float64]):
+
+    class MeanTask(Task):
         def do(self, batch: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
             mean = np.mean(items, axis=1)
             return mean
@@ -66,21 +34,6 @@ class Task(ABC, Generic[T]):
     task = MeanTask()
     mean = task.do(arr)  # Returns: np.array([2., 5.])
     ```
-
-    !!! note
-        [`TaskRunner`][runner.TaskRunner] calls [`run_batch()`][task.Task.run_batch] to
-        produce a [`Result`][results.Result] to handle any setup, teardown, and
-        errors.
-
-        You can get the same data from our `task` by accessing
-        [`Result.value`][results.Result.value].
-
-        ```python
-        index = 0
-        result = task.run_batch(index, arr)
-        result.value  # Returns: np.array([2., 5.])
-        ```
-
     """
 
     def __init__(self) -> None:
@@ -91,7 +44,7 @@ class Task(ABC, Generic[T]):
         self,
         *args: Any,
         **kwargs: Any,
-    ) -> T | Exception:
+    ) -> Any | Exception:
         """Batch process data.
 
         This method defines the computation logic for batch processing a collection

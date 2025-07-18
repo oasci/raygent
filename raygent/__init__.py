@@ -6,10 +6,12 @@ from ast import literal_eval
 
 from loguru import logger
 
-from .runner import TaskRunner
+from .batch import batch_generator
+from .results import BatchMessage
 from .task import Task
+from .workflow import DAG
 
-__all__ = ["TaskRunner", "Task"]
+__all__ = ["batch_generator", "BatchMessage", "Task", "DAG"]
 
 logger.disable("raygent")
 
@@ -48,7 +50,7 @@ def enable_logging(
                 "sink": file_path,
                 "level": level_set,
                 "format": log_format,
-                "colorize": True,
+                "colorize": False,
             }
         )
     # https://loguru.readthedocs.io/en/stable/api/logger.html#loguru._logger.Logger.configure

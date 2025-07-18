@@ -1,4 +1,4 @@
-from .handler import ResultsHandler, HandlerType
+from .handler import ResultsHandler
 from .collector import ResultsCollector
 from .online_mean import OnlineMeanResultsHandler
 from .sum import SumResultsHandler
@@ -6,7 +6,6 @@ from .sum import SumResultsHandler
 
 __all__ = [
     "ResultsHandler",
-    "HandlerType",
     "ResultsCollector",
     "OnlineMeanResultsHandler",
     "SumResultsHandler",

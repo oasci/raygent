@@ -2,26 +2,22 @@ from typing import override
 
 import pytest
 
-from raygent.batch import batch_generator
-from raygent.results import BatchMessage
-from raygent.results.handlers import ResultsCollector
-from raygent.task import Task
-from raygent.workflow import DAG
+from raygent import DAG, BatchMessage, Task, batch_generator
 
 
-class SquareTask(Task[list[int]]):
+class SquareTask(Task):
     @override
     def do(self, batch: list[int]) -> list[int]:
         return [x * x for x in batch]
 
 
-class PrefactorTask(Task[list[int]]):
+class PrefactorTask(Task):
     @override
     def do(self, batch: list[int], factor: int = 2) -> list[int]:
         return [factor * x for x in batch]
 
 
-class SumTask(Task[list[int]]):
+class SumTask(Task):
     @override
     def do(self, batch: dict[str, list[int]]) -> list[int]:
         return [a + b for a, b in zip(batch["a"], batch["b"])]
@@ -50,7 +46,7 @@ def test_sum_task_functional() -> None:
     assert SumTask().do(batch) == [11, 22, 33]
 
 
-class _CombineTask(Task[dict[str, list[int]]]):
+class _CombineTask(Task):
     """Merge two list batches into a dict so that `SumTask` can consume them."""
 
     @override
@@ -58,7 +54,7 @@ class _CombineTask(Task[dict[str, list[int]]]):
         return {"a": a, "b": b}
 
 
-def test_multi_node_dag_pipeline_add():
+def test_multi_node_dag_pipeline():
     """A three-stage pipeline exercising multi-input alignment & back-pressure.
 
     Layout::
@@ -77,7 +73,7 @@ def test_multi_node_dag_pipeline_add():
     sq2, source_2 = dag.add_source(SquareTask(), 1)
 
     comb = dag.add(_CombineTask(), inputs=(sq1, sq2))
-    summed, sink_1 = dag.add_sink(SumTask(), inputs=(comb,), handler=ResultsCollector())
+    summed, sink_1 = dag.add_sink(SumTask(), inputs=(comb,))
     dag.run()
 
     list1 = [1, 2, 3, 4]
@@ -93,5 +89,3 @@ def test_multi_node_dag_pipeline_add():
         msg = sink_1.get(timeout=5)
         assert msg.index == idx
         assert expected[idx] == msg.payload
-    
-    # TODO: Need to implement way to get handler from summed.

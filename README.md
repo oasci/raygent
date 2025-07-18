@@ -40,9 +40,7 @@ from raygent import Task, TaskRunner
 from raygent.results.handlers import ResultsCollector
 
 # Define your task
-class SquareTask(
-    Task[list[float]]
-):
+class SquareTask(Task):
     def do(self, batch: list[float]):
         return [item ** 2 for item in batch]
 

@@ -1,12 +1,11 @@
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any, Never, override
 
 import uuid
 from dataclasses import dataclass, field
 
 import ray
 
-from raygent.results import BatchMessage, IndexedResult
-from raygent.results.handlers.handler import ResultsHandler
+from raygent.results import BatchMessage
 from raygent.workflow import BoundedQueue
 
 if TYPE_CHECKING:
@@ -14,24 +13,21 @@ if TYPE_CHECKING:
     from ray.util.queue import Queue
 
     from raygent import Task
-    from raygent.results.handlers import ResultsHandler
 
 
 @ray.remote
-class TaskActor[T]:
-    def __init__(self, task: "Task[T]", num_inputs: int) -> None:
+class TaskActor:
+    def __init__(self, task: "Task", num_inputs: int) -> None:
         """
         Args:
             task: The [`Task`][task.Task] this Actor is responsible for.
             num_inputs: The number of inputs this `task` takes.
         """
-        self.task: "Task[T]" = task
+        self.task: "Task" = task
         self.num_inputs: int = num_inputs
         self.input_queues: "list[Queue]" = []
         self.buffers: list[dict[int, Any]] = [{} for _ in range(num_inputs)]
-        self.next_index: int = 0
         self.output_queues: "list[Queue]" = []
-        self.handler: "ResultsHandler[T] | None" = None
 
     def register_input(self, queue: "Queue") -> None:
         """Register a source queue for an input of `task`"""
@@ -41,57 +37,49 @@ class TaskActor[T]:
         """Register a sink queue for a `TaskActor` that consumes this output."""
         self.output_queues.append(queue)
 
-    def register_handler(self, handler: "ResultsHandler[T]") -> None:
-        self.handler = handler
-
-    def run(self):
+    def run(self) -> Never:
         assert len(self.input_queues) == self.num_inputs
 
         while True:
-            # Blocking until we have next_index in all input buffers
-            for i, q in enumerate(self.input_queues):
-                while self.next_index not in self.buffers[i]:
-                    msg: BatchMessage[T] = q.get()
-                    self.buffers[i][msg.index] = msg.payload
+            # 1) See if any index is “ready” (in all buffers).
+            common_idxs = set(self.buffers[0].keys())
+            for buf in self.buffers[1:]:
+                common_idxs &= buf.keys()
 
-            # Gather aligned batches
-            batches = [buf.pop(self.next_index) for buf in self.buffers]
+            if common_idxs:
+                # Process all ready indices in sorted order
+                for idx in sorted(common_idxs):
+                    batch = [buf.pop(idx) for buf in self.buffers]
+                    result = self.task.do(*batch)
+                    msg = BatchMessage(index=idx, payload=result)
+                    for out_q in self.output_queues:
+                        out_q.put(msg)
+                continue
 
-            # Execute task
-            output = self.task.do(*batches)
-
-            # Fan out to all downstream queues
-            for out_q in self.output_queues:
-                out_q.put(BatchMessage(index=self.next_index, payload=output))
-
-            # Handle locally if final
-            if self.handler:
-                self.handler.add_result(
-                    IndexedResult(value=output, index=self.next_index)
-                )
-
-            self.next_index += 1
-
-    def get_handler(self) -> ResultsHandler[T] | None:
-        return self.handler
+            # 2) If nothing is ready yet, fetch exactly one more message.
+            #    Choose the input whose buffer is smallest to balance reads.
+            sizes = [len(buf) for buf in self.buffers]
+            i = sizes.index(min(sizes))
+            # This will block only if that queue is empty; otherwise immediately
+            msg = self.input_queues[i].get()
+            self.buffers[i][msg.index] = msg.payload
 
 
 @dataclass(slots=True, kw_only=True)
-class NodeHandle[T]:
+class NodeHandle:
     """Light-weight handle around an instantiated `TaskActor`.
 
-    Users primarily need this so they can reference the node as *input* when
+    Users primarily need this so they can reference the node as input when
     adding downstream tasks.
     """
 
     actor: "ActorHandle"
-    inputs: list[BoundedQueue[T]] = field(default_factory=list, repr=False)
-    outputs: list[BoundedQueue[T]] = field(default_factory=list, repr=False)
+    inputs: list[BoundedQueue] = field(default_factory=list, repr=False)
+    outputs: list[BoundedQueue] = field(default_factory=list, repr=False)
 
-    # Unique identifier mainly for debugging; *not* used as a dict key in DAG.
     uid: str = field(default_factory=lambda: uuid.uuid4().hex[:8], init=False)
 
     @override
-    def __repr__(self) -> str:  # pragma: no cover – cosmetic
+    def __repr__(self) -> str:
         cname = type(self.actor).__name__
         return f"<NodeHandle {cname}[uid={self.uid}]>"

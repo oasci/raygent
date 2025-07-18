@@ -59,6 +59,3 @@ class ResultsHandler(ABC, Generic[T]):
     def finalize(self) -> None:
         """Finish up any handling"""
         logger.warning(f"finalize is not implemented on {self}")
-
-
-HandlerType = TypeVar("HandlerType", bound=ResultsHandler[Any])

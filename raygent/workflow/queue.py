@@ -1,16 +1,14 @@
-from typing import Any, Generic, TypeVar, override
+from typing import Any, override
 
 from ray.util.queue import Queue
 
-T = TypeVar("T")
 
-
-class BoundedQueue(Queue, Generic[T]):
+class BoundedQueue(Queue):
     """Thin wrapper around `ray.util.queue.Queue` enforcing `maxsize`.
 
     Ray's `Queue` already supports a `maxsize` parameter for built-in
-    back-pressure (producers block once the queue is full).  This subclass
-    merely makes `maxsize` a **mandatory** positional argument so edges cannot
+    back-pressure (producers block once the queue is full). This subclass
+    merely makes `maxsize` a mandatory positional argument so edges cannot
     accidentally be created unbounded.
     """
 

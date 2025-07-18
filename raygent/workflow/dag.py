@@ -36,29 +36,27 @@ class DAG:
         if queue_size <= 0:
             raise ValueError("queue_size must be positive")
         self._default_qsize: int = queue_size
-        self._nodes: dict[str, NodeHandle[Any]] = {}
+        self._nodes: dict[str, NodeHandle] = {}
         self._started: bool = False
 
     def add(
         self,
-        task: "Task[T]",
+        task: "Task",
         /,
         *,
-        inputs: Iterable[NodeHandle[Any]] | None = None,
+        inputs: Iterable[NodeHandle] | None = None,
         name: str | None = None,
-        handler: ResultsHandler[Any] | None = None,
         queue_size: int | None = None,
-    ) -> NodeHandle[Any]:
+    ) -> NodeHandle:
         """Instantiate *task* as a `TaskActor` and connect it to *inputs*.
 
         Args:
-            task: An implementation of your [`Task`]task.Task] API.
-            sources: Zero or more source queues to attach.
+            task: An implementation of your [`Task`][task.Task] API.
             inputs: Zero or more upstream `NodeHandle` objects.
             name: Optional symbolic name. If omitted, a unique one is
                 derived from the task class and a UUID snippet.
-            queue_size: Override for *this node's* incoming queues; defaults to
-                the builder-level ``queue_size``.
+            queue_size: Override for this node's incoming queues; defaults to
+                the builder-level `queue_size`.
 
         Returns:
             A `NodeHandle` you can reference later when wiring children.
@@ -67,7 +65,7 @@ class DAG:
         if self._started:
             raise RuntimeError("Cannot add nodes after DAG has been started")
 
-        parents: list[NodeHandle[Any]] = list(inputs or [])
+        parents: list[NodeHandle] = list(inputs or [])
         n_inputs: int = len(parents)
         actor = TaskActor.remote(task, n_inputs)
 
@@ -75,14 +73,12 @@ class DAG:
         inbound_queues: "list[Queue]" = []
         qsize = queue_size or self._default_qsize
         for parent in parents:
-            q = BoundedQueue[T](qsize)
+            q = BoundedQueue(qsize)
             parent.actor.register_output.remote(q)
             parent.outputs.append(q)
             actor.register_input.remote(q)
             inbound_queues.append(q)
 
-        if handler:
-            actor.register_handler.remote(handler)
         handle = NodeHandle(actor=actor)
         key = name or f"{task.__class__.__name__}-{handle.uid}"
         if key in self._nodes:
@@ -94,37 +90,37 @@ class DAG:
     @overload
     def add_source(
         self,
-        task: "Task[T]",
+        task: "Task",
         n_sources: Literal[1],
         /,
         *,
         name: str | None = None,
         handler: ResultsHandler[Any] | None = None,
         queue_size: int | None = None,
-    ) -> tuple[NodeHandle[T], BoundedQueue[T]]: ...
+    ) -> tuple[NodeHandle, BoundedQueue]: ...
 
     @overload
     def add_source(
         self,
-        task: "Task[T]",
+        task: "Task",
         n_sources: int,
         /,
         *,
         name: str | None = None,
         handler: ResultsHandler[Any] | None = None,
         queue_size: int | None = None,
-    ) -> tuple[NodeHandle[T], list[BoundedQueue[T]]]: ...
+    ) -> tuple[NodeHandle, list[BoundedQueue]]: ...
 
     def add_source(
         self,
-        task: "Task[T]",
+        task: "Task",
         n_sources: int,
         /,
         *,
         name: str | None = None,
         handler: ResultsHandler[Any] | None = None,
         queue_size: int | None = None,
-    ) -> tuple[NodeHandle[T], BoundedQueue[T] | list[BoundedQueue[T]]]:
+    ) -> tuple[NodeHandle, BoundedQueue | list[BoundedQueue]]:
         """Add a *root* operator and hand back its inbound queue.
 
         Returns (handle, queue) so you can `queue.put(...)` from the driver.
@@ -137,7 +133,7 @@ class DAG:
 
         if handler:
             actor.register_handler.remote(handler)
-        handle = NodeHandle[T](actor=actor, inputs=sources)
+        handle = NodeHandle(actor=actor, inputs=sources)
         key = name or f"{task.__class__.__name__}-{handle.uid}"
         if key in self._nodes:
             raise ValueError(f"Duplicate node name: {key!r}")
@@ -148,14 +144,14 @@ class DAG:
 
     def add_sink(
         self,
-        task: "Task[T]",
+        task: "Task",
         /,
         *,
-        inputs: Iterable[NodeHandle[Any]] | None = None,
+        inputs: Iterable[NodeHandle] | None = None,
         name: str | None = None,
         handler: ResultsHandler[Any] | None = None,
         queue_size: int | None = None,
-    ) -> tuple[NodeHandle[Any], BoundedQueue[Any]]:
+    ) -> tuple[NodeHandle, BoundedQueue]:
         """Instantiate *task* as a `TaskActor` and connect it to *inputs*.
 
         Args:
@@ -174,20 +170,20 @@ class DAG:
         if self._started:
             raise RuntimeError("Cannot add nodes after DAG has been started")
 
-        parents: list[NodeHandle[Any]] = list(inputs or [])
+        parents: list[NodeHandle] = list(inputs or [])
         n_inputs: int = len(parents)
         actor = TaskActor.remote(task, n_inputs)
 
         inbound_queues: "list[Queue]" = []
         qsize = queue_size or self._default_qsize
         for parent in parents:
-            q = BoundedQueue[T](qsize)
+            q = BoundedQueue(qsize)
             parent.actor.register_output.remote(q)
             parent.outputs.append(q)
             actor.register_input.remote(q)
             inbound_queues.append(q)
 
-        sink_queue: BoundedQueue[Any] = BoundedQueue[Any](qsize)
+        sink_queue: BoundedQueue = BoundedQueue(qsize)
         actor.register_output.remote(sink_queue)
 
         if handler:
@@ -225,6 +221,6 @@ class DAG:
         return len(self._nodes)
 
     @override
-    def __repr__(self) -> str:  # pragma: no cover – cosmetic
+    def __repr__(self) -> str:
         parts = ", ".join(self._nodes)
         return f"<DAG nodes=[{parts}] started={self._started}>"
