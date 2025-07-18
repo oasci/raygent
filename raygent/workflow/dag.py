@@ -1,17 +1,21 @@
 """Minimalist DAG builder for deterministic, batch-synchronous stream processing."""
 
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload, override
 
 from collections.abc import Iterable, Sequence
 
 import ray
 
 from raygent.workflow import BoundedQueue, NodeHandle, TaskActor
+from raygent.workflow.queue import BoundedQueue
 
 if TYPE_CHECKING:
+    from ray.actor import ActorHandle
     from ray.util.queue import Queue
 
     from raygent import Task
+
+T = TypeVar("T")
 
 
 class DAG:
@@ -32,22 +36,23 @@ class DAG:
         if queue_size <= 0:
             raise ValueError("queue_size must be positive")
         self._default_qsize: int = queue_size
-        self._nodes: dict[str, NodeHandle] = {}
+        self._nodes: dict[str, NodeHandle[Any]] = {}
         self._started: bool = False
 
     def add(
         self,
-        task: "Task[Any]",
+        task: "Task[T]",
         /,
         *,
-        inputs: Iterable[NodeHandle] | None = None,
+        inputs: Iterable[NodeHandle[Any]] | None = None,
         name: str | None = None,
         queue_size: int | None = None,
-    ) -> NodeHandle:
-        """Instantiate *task* as a ``TaskActor`` and connect it to *inputs*.
+    ) -> NodeHandle[Any]:
+        """Instantiate *task* as a `TaskActor` and connect it to *inputs*.
 
         Args:
             task: An implementation of your [`Task`]task.Task] API.
+            sources: Zero or more source queues to attach.
             inputs: Zero or more upstream `NodeHandle` objects.
             name: Optional symbolic name. If omitted, a unique one is
                 derived from the task class and a UUID snippet.
@@ -61,7 +66,7 @@ class DAG:
         if self._started:
             raise RuntimeError("Cannot add nodes after DAG has been started")
 
-        parents: list[NodeHandle] = list(inputs or [])
+        parents: list[NodeHandle[Any]] = list(inputs or [])
         n_inputs: int = len(parents)
         actor = TaskActor.remote(task, n_inputs)
 
@@ -69,7 +74,7 @@ class DAG:
         inbound_queues: "list[Queue]" = []
         qsize = queue_size or self._default_qsize
         for parent in parents:
-            q = BoundedQueue(qsize)
+            q = BoundedQueue[T](qsize)
             parent.actor.register_output.remote(q)
             parent.outputs.append(q)
             actor.register_input.remote(q)
@@ -82,6 +87,107 @@ class DAG:
         self._nodes[key] = handle
 
         return handle
+
+    @overload
+    def add_source(
+        self,
+        task: "Task[T]",
+        n_sources: Literal[1],
+        /,
+        *,
+        name: str | None = None,
+        queue_size: int | None = None,
+    ) -> tuple[NodeHandle[T], BoundedQueue[T]]: ...
+
+    @overload
+    def add_source(
+        self,
+        task: "Task[T]",
+        n_sources: int,
+        /,
+        *,
+        name: str | None = None,
+        queue_size: int | None = None,
+    ) -> tuple[NodeHandle[T], list[BoundedQueue[T]]]: ...
+
+    def add_source(
+        self,
+        task: "Task[T]",
+        n_sources: int,
+        /,
+        *,
+        name: str | None = None,
+        queue_size: int | None = None,
+    ) -> tuple[NodeHandle[T], BoundedQueue[T] | list[BoundedQueue[T]]]:
+        """Add a *root* operator and hand back its inbound queue.
+
+        Returns (handle, queue) so you can `queue.put(...)` from the driver.
+        """
+        qsize = queue_size or self._default_qsize
+        actor = TaskActor.remote(task, n_sources)
+        sources = [BoundedQueue(qsize) for _ in range(n_sources)]
+        for source in sources:
+            actor.register_input.remote(source)
+
+        handle = NodeHandle[T](actor=actor, inputs=sources)
+        key = name or f"{task.__class__.__name__}-{handle.uid}"
+        if key in self._nodes:
+            raise ValueError(f"Duplicate node name: {key!r}")
+        self._nodes[key] = handle
+        if len(sources) == 1:
+            sources = sources[0]
+        return handle, sources
+
+    def add_sink(
+        self,
+        task: "Task[T]",
+        /,
+        *,
+        inputs: Iterable[NodeHandle[Any]] | None = None,
+        name: str | None = None,
+        queue_size: int | None = None,
+    ) -> tuple[NodeHandle[Any], BoundedQueue[Any]]:
+        """Instantiate *task* as a `TaskActor` and connect it to *inputs*.
+
+        Args:
+            task: An implementation of your [`Task`]task.Task] API.
+            sources: Zero or more source queues to attach.
+            inputs: Zero or more upstream `NodeHandle` objects.
+            name: Optional symbolic name. If omitted, a unique one is
+                derived from the task class and a UUID snippet.
+            queue_size: Override for *this node's* incoming queues; defaults to
+                the builder-level ``queue_size``.
+
+        Returns:
+            A `NodeHandle` you can reference later when wiring children.
+        """
+
+        if self._started:
+            raise RuntimeError("Cannot add nodes after DAG has been started")
+
+        parents: list[NodeHandle[Any]] = list(inputs or [])
+        n_inputs: int = len(parents)
+        actor = TaskActor.remote(task, n_inputs)
+
+        inbound_queues: "list[Queue]" = []
+        qsize = queue_size or self._default_qsize
+        for parent in parents:
+            q = BoundedQueue[T](qsize)
+            parent.actor.register_output.remote(q)
+            parent.outputs.append(q)
+            actor.register_input.remote(q)
+            inbound_queues.append(q)
+
+        sink_queue: BoundedQueue[Any] = BoundedQueue[Any](qsize)
+        actor.register_output.remote(sink_queue)
+
+        handle = NodeHandle(actor=actor)
+        key = name or f"{task.__class__.__name__}-{handle.uid}"
+        if key in self._nodes:
+            raise ValueError(f"Duplicate node name: {key!r}")
+        self._nodes[key] = handle
+
+        return handle, sink_queue
 
     def run(self) -> None:
         """Start the *main loop* (`.run()`) on every added ``TaskActor``."""
@@ -100,7 +206,7 @@ class DAG:
                 pass
         self._started = False
 
-    def actor_handles(self) -> Sequence[ray.actor.ActorHandle]:
+    def actor_handles(self) -> "Sequence[ActorHandle]":
         """Return a *read-only* view of every underlying actor handle."""
         return tuple(h.actor for h in self._nodes.values())
 
