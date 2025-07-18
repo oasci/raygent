@@ -1,14 +1,13 @@
-from typing import Generic, ParamSpec, TypeVar
+from typing import Any, Generic, TypeVar
 
 from abc import ABC, abstractmethod
 
 from raygent.results import IndexedResult
 
-P = ParamSpec("P")
 T = TypeVar("T")
 
 
-class Task(ABC, Generic[P, T]):
+class Task(ABC, Generic[T]):
     """Protocol for executing computational tasks on collections of data.
 
     The `Task` class provides a flexible framework for processing data items and
@@ -90,8 +89,8 @@ class Task(ABC, Generic[P, T]):
     def run_batch(
         self,
         index: int,
-        *args: P.args,
-        **kwargs: P.kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> IndexedResult[T]:
         """This method serves as the primary entry point for
         [`TaskRunner`][runner.TaskRunner].
@@ -133,8 +132,8 @@ class Task(ABC, Generic[P, T]):
     @abstractmethod
     def do(
         self,
-        *args: P.args,
-        **kwargs: P.kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> T | Exception:
         """Batch process data.
 

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Generic, ParamSpec, TypeVar, Unpack
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Unpack
 
 from collections.abc import Generator, Iterable, Mapping
 
@@ -18,11 +18,10 @@ from raygent.results.handlers import ResultsHandler
 if TYPE_CHECKING:
     from raygent import Task
 
-P = ParamSpec("P")
 T = TypeVar("T")
 
 
-class TaskRunner(Generic[P, T]):
+class TaskRunner(Generic[T]):
     """
     A runner class for handling task submissions and result handling using serial
     or parallel computation.
@@ -30,7 +29,7 @@ class TaskRunner(Generic[P, T]):
 
     def __init__(
         self,
-        task_cls: "type[Task[P, T]]",
+        task_cls: "type[Task[T]]",
         handler_cls: type[ResultsHandler[T]],
         n_cores: int = -1,
         in_parallel: bool = False,
@@ -48,7 +47,7 @@ class TaskRunner(Generic[P, T]):
                 `in_parallel` is `True`.
         """
 
-        self.task_cls: "type[Task[P, T]]" = task_cls
+        self.task_cls: "type[Task[T]]" = task_cls
         """
         A class that follows the [`Task`][task.Task] protocol.
         """
@@ -401,7 +400,13 @@ class TaskRunner(Generic[P, T]):
             logger.debug(f"Submitting Ray task which index of {index}")
             future = ray_worker.options(
                 num_cpus=self.n_cores_worker, *args_remote, **kwargs_remote
-            ).remote(self.task_cls, index, *batch_item_args, *args_task, **kwargs_task)
+            ).remote(
+                self.task_cls,
+                index,
+                *batch_item_args,
+                *args_task,
+                **kwargs_task,
+            )
             self.futures.append(future)
 
         # Process any remaining futures.
