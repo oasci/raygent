@@ -57,25 +57,25 @@ def _node(name: str, task_cls, **kwargs) -> WorkflowNode:
 
 
 def test_linear_pipeline():
-    """src → square → double → sink."""
+    """src -> square -> double -> sink."""
     node_src = _node("src", SquareTask)
     node_double = _node("double", PrefactorTask)
     node_sink = _node("sink", PrefactorTask)
 
     edges = [
-        WorkflowEdge("src", "double", "batch"),
-        WorkflowEdge("double", "sink", "batch"),
+        WorkflowEdge("src", "double", pos=0),
+        WorkflowEdge("double", "sink", pos=0),
     ]
 
     graph = WorkflowGraph.from_iterables([node_src, node_double, node_sink], edges)
     runner = WorkflowRunner(graph, parallel=False, default_concurrency=2)
-    outs = runner.run({"src": [[1], [2]]}, batch_size=1)
+    outs = runner.run({"src": [1, 2]}, batch_size=1)
 
-    assert outs["sink"] == [[4], [16]]  # (square → double) twice
+    assert outs["sink"] == [[4], [16]]  # (square -> double) twice
 
 
 def test_fan_in_selector_transform(range_batches):
-    """Two sources → transform on one edge → join-sum → sink."""
+    """Two sources -> transform on one edge -> join-sum -> sink."""
     node_a = _node("src_a", SquareTask)  # 1², 2², 3²
     node_b = _node("src_b", SquareTask)  # 10², 20², 30²
     node_join = _node("join", SumTask)
@@ -124,7 +124,7 @@ def test_broadcast_constant(range_batches):
     runner = WorkflowRunner(graph)
     outs = runner.run(
         {
-            "config": [["dummy"]],  # single element → broadcast
+            "config": [["dummy"]],  # single element -> broadcast
             "data_src": [[2], [4]],
         },
         batch_size=1,

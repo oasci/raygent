@@ -34,7 +34,7 @@ class WorkflowNode(Generic[T, HandlerType]):
     """
 
     name: str
-    runner: TaskRunner[T, HandlerType]
+    runner: TaskRunner[HandlerType]
 
     retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
     kwargs_task: Mapping[str, Any] = field(default_factory=dict)
@@ -50,7 +50,7 @@ class WorkflowNode(Generic[T, HandlerType]):
     results_ref: Any | None = field(init=False, default=None)
     input_ref: Any | None = field(init=False, default=None)
 
-    def resolve_runner(self) -> TaskRunner[T, HandlerType]:
+    def resolve_runner(self) -> TaskRunner[HandlerType]:
         """Return the underlying runner.
 
         This is often used when validating types for edges.

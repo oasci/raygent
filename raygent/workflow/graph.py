@@ -27,7 +27,7 @@ class WorkflowGraph:
 
         self._validate_unique_names()
         self._validate_edges_exist()
-        self._validate_unique_dst_keys()
+        self._validate_unique_dst_pos()
         self._validate_acyclic()
         self._validate_edge_types()
 
@@ -45,6 +45,10 @@ class WorkflowGraph:
     def children(self, node: str) -> Sequence[WorkflowEdgeAny]:
         return [e for e in self.edges if e.src == node]
 
+    def input_pos(self, node: str) -> set[int]:
+        """All the positional slots (0,1,2,…) that this node expects."""
+        return {e.pos for e in self.edges if e.src == node}
+
     def sources(self) -> Sequence[str]:
         return [n for n in self.nodes if not any(e.dst == n for e in self.edges)]
 
@@ -61,16 +65,14 @@ class WorkflowGraph:
             if e.src not in node_set or e.dst not in node_set:
                 raise ValueError(f"Edge {e} references unknown node(s).")
 
-    def _validate_unique_dst_keys(self) -> None:
-        per_node: MutableMapping[str, set[str]] = {}
+    def _validate_unique_dst_pos(self) -> None:
+        per_node: MutableMapping[str, set[int]] = {}
         for e in self.edges:
             if e.dst not in per_node:
                 per_node[e.dst] = set()
-            if e.dst_key in per_node[e.dst]:
-                raise ValueError(
-                    f"Duplicate dst_key {e.dst_key!r} into node {e.dst!r}."
-                )
-            per_node[e.dst].add(e.dst_key)
+            if e.pos in per_node[e.dst]:
+                raise ValueError(f"Duplicate dst_key {e.pos!r} into node {e.dst!r}.")
+            per_node[e.dst].add(e.pos)
 
     def _validate_acyclic(self) -> None:
         visited: set[str] = set()

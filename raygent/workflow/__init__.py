@@ -1,6 +1,6 @@
 from .node import WorkflowNode
 from .edge import WorkflowEdge
 from .graph import WorkflowGraph
-from .workflow import Workflow
+from .runners import WorkflowRunner
 
-__all__ = ["WorkflowNode", "WorkflowEdge", "WorkflowGraph", "Workflow"]
+__all__ = ["WorkflowNode", "WorkflowEdge", "WorkflowGraph", "WorkflowRunner"]

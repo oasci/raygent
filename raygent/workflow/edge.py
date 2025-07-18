@@ -21,8 +21,8 @@ class WorkflowEdge(Generic[SourceT, TailT]):
     dst: str
     """Name of destination node."""
 
-    dst_key: str
-    """Name of data this edge provides to `dst`."""
+    pos: int
+    """Parameter position in `dst` this feeds into."""
 
     transform: Callable[[SourceT], TailT] | None = None
     """A function that transforms data from the source node to the tail node."""

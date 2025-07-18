@@ -210,7 +210,6 @@ class TaskRunner(Generic[T]):
         *data_streams: Unpack[tuple[Iterable[Any]]],
         batch_size: int = 10,
         prebatched: bool = False,
-        args_task: tuple[object] | None = None,
         kwargs_task: Mapping[str, object] | None = None,
         args_remote: tuple[object] | None = None,
         kwargs_remote: Mapping[str, object] | None = None,
@@ -226,7 +225,6 @@ class TaskRunner(Generic[T]):
             batch_size: Number of items per processing batch. Larger values may improve
                 performance but increase memory usage per worker.
             prebatched: `data` is already an iterable of batches.
-            args_task: Arguments for [`run_batch`][task.Task.run_batch].
             kwargs_task: Keyword arguments for [`run_batch`][task.Task.run_batch].
             args_remote: Arguments for Ray's remote function options.
             kwargs_remote: Keyword arguments to pass to Ray's remote function options.
@@ -282,11 +280,9 @@ class TaskRunner(Generic[T]):
         )
 
         if self.in_parallel:
-            self._submit_ray(
-                batch_gen, args_task, kwargs_task, args_remote, kwargs_remote
-            )
+            self._submit_ray(batch_gen, kwargs_task, args_remote, kwargs_remote)
         else:
-            self._submit(batch_gen, args_task, kwargs_task)
+            self._submit(batch_gen, kwargs_task)
 
         self.handler.finalize()
         return self.handler
@@ -294,7 +290,6 @@ class TaskRunner(Generic[T]):
     def _submit(
         self,
         batch_gen: Generator[tuple[int, tuple[*Ts]], None, None],
-        args_task: tuple[object] | None = None,
         kwargs_task: Mapping[str, object] | None = None,
     ) -> None:
         """
@@ -315,15 +310,13 @@ class TaskRunner(Generic[T]):
             None. The processed results are stored in the instance attribute
                 `self.results`.
         """
-        if args_task is None:
-            args_task = tuple()
         if kwargs_task is None:
             kwargs_task = {}
         logger.debug("Running tasks in serial")
         for index, batch_item_args in batch_gen:
             task_instance = self.task_cls()
             results_batch = task_instance.run_batch(
-                index, *batch_item_args, *args_task, **kwargs_task
+                index, *batch_item_args, **kwargs_task
             )
             self.handler.add_result(results_batch)
             self.handler.save()
@@ -331,7 +324,6 @@ class TaskRunner(Generic[T]):
     def _submit_ray(
         self,
         batch_gen: Generator[tuple[int, tuple[*Ts]], None, None],
-        args_task: tuple[object] | None = None,
         kwargs_task: Mapping[str, object] | None = None,
         args_remote: tuple[object] | None = None,
         kwargs_remote: Mapping[str, object] | None = None,
@@ -369,8 +361,6 @@ class TaskRunner(Generic[T]):
         """
         # pyright: reportUnknownMemberType=false, reportPossiblyUnboundVariable=false
         # pyright: reportUnknownArgumentType=false
-        if args_task is None:
-            args_task = tuple()
         if kwargs_task is None:
             kwargs_task = {}
         if args_remote is None:
@@ -404,7 +394,6 @@ class TaskRunner(Generic[T]):
                 self.task_cls,
                 index,
                 *batch_item_args,
-                *args_task,
                 **kwargs_task,
             )
             self.futures.append(future)
