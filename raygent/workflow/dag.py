@@ -1,4 +1,4 @@
-"""Minimalist DAG builder for deterministic, batch‑synchronous stream processing."""
+"""Minimalist DAG builder for deterministic, batch-synchronous stream processing."""
 
 from typing import TYPE_CHECKING, Any, override
 
@@ -15,10 +15,10 @@ if TYPE_CHECKING:
 
 
 class DAG:
-    """Builder / orchestrator for a deterministic, queue‑backed execution graph.
+    """Builder / orchestrator for a deterministic, queue-backed execution graph.
 
-    The builder is *stateful* – you add tasks one by one, and the class wires
-    queues & actors as you go.  Once you've added everything, call
+    The builder is *stateful*. You add tasks one by one, and the class wires
+    queues & actors as you go. Once you've added everything, call
     `run` to start every actor's main loop concurrently.
     """
 
@@ -52,7 +52,7 @@ class DAG:
             name: Optional symbolic name. If omitted, a unique one is
                 derived from the task class and a UUID snippet.
             queue_size: Override for *this node's* incoming queues; defaults to
-                the builder‑level ``queue_size``.
+                the builder-level ``queue_size``.
 
         Returns:
             A `NodeHandle` you can reference later when wiring children.
@@ -101,7 +101,7 @@ class DAG:
         self._started = False
 
     def actor_handles(self) -> Sequence[ray.actor.ActorHandle]:
-        """Return a *read‑only* view of every underlying actor handle."""
+        """Return a *read-only* view of every underlying actor handle."""
         return tuple(h.actor for h in self._nodes.values())
 
     def __len__(self) -> int:

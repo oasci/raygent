@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, override, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, override
 
 import uuid
 from dataclasses import dataclass, field
@@ -18,7 +18,7 @@ T = TypeVar("T")
 
 
 @ray.remote
-class TaskActor[T]:
+class TaskActor:
     def __init__(self, task: "Task[T]", num_inputs: int) -> None:
         """
         Args:
