@@ -1,11 +1,11 @@
-from typing import Any, Generic
+from typing import Any, Generic, TypeVar
 
 from abc import ABC, abstractmethod
 
-from raygent.dtypes import OutputType
+T = TypeVar("T")
 
 
-class Saver(ABC, Generic[OutputType]):
+class Saver(ABC, Generic[T]):
     """Abstract base class for saving data in various formats or destinations.
 
     The Saver class provides a standardized interface for persisting computational
@@ -23,7 +23,7 @@ class Saver(ABC, Generic[OutputType]):
     @abstractmethod
     def save(
         self,
-        data: OutputType,
+        data: T,
         indices: Any | None = None,
         **kwargs: dict[str, Any],
     ) -> None:

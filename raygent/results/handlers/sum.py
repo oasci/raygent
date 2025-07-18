@@ -1,17 +1,16 @@
-from typing import override
+from typing import TypeVar, override
 
-from raygent.dtypes import OutputType
 from raygent.results import Result
 from raygent.results.handlers import ResultsHandler
 from raygent.savers import Saver
 
+T = TypeVar("T")
 
-class SumResultsHandler(ResultsHandler[OutputType]):
+
+class SumResultsHandler(ResultsHandler[T]):
     """Sum all results."""
 
-    def __init__(
-        self, saver: Saver[OutputType] | None = None, save_interval: int = 1
-    ) -> None:
+    def __init__(self, saver: Saver[T] | None = None, save_interval: int = 1) -> None:
         """
         Args:
             saver: An instance of a Saver responsible for persisting results. If None,
@@ -20,7 +19,7 @@ class SumResultsHandler(ResultsHandler[OutputType]):
                 a save.
         """
 
-        self.sum: OutputType | None = None
+        self.sum: T | None = None
         """
         The current global sum of all processed results.
         """
@@ -29,7 +28,7 @@ class SumResultsHandler(ResultsHandler[OutputType]):
     @override
     def add_result(
         self,
-        result: Result[OutputType],
+        result: Result[T],
         *args: object,
         **kwargs: object,
     ) -> None:
@@ -44,7 +43,7 @@ class SumResultsHandler(ResultsHandler[OutputType]):
             self.sum += result.value
 
     @override
-    def get(self) -> OutputType:
+    def get(self) -> T:
         """
         Retrieves the final computed global mean along with the total number of
         observations.

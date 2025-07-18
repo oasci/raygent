@@ -4,18 +4,17 @@ from abc import ABC, abstractmethod
 
 from loguru import logger
 
-from raygent.dtypes import OutputType
 from raygent.savers import Saver
 
+T = TypeVar("T")
 
-class ResultsHandler(ABC, Generic[OutputType]):
+
+class ResultsHandler(ABC, Generic[T]):
     """
     Abstract base class for handling results from [`Task`][task.Task].
     """
 
-    def __init__(
-        self, saver: Saver[OutputType] | None = None, save_interval: int = 1
-    ) -> None:
+    def __init__(self, saver: Saver[T] | None = None, save_interval: int = 1) -> None:
         """
         Args:
             saver: An instance of a Saver responsible for persisting results. If None,
@@ -23,7 +22,7 @@ class ResultsHandler(ABC, Generic[OutputType]):
             save_interval: The minimum number of results required before triggering
                 a save.
         """
-        self.saver: Saver[OutputType] | None = saver
+        self.saver: Saver[T] | None = saver
         self.save_interval: int = save_interval
 
     @abstractmethod

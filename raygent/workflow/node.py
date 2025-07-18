@@ -1,4 +1,4 @@
-from typing import Any, Generic
+from typing import Any, Generic, TypeVar
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -6,8 +6,9 @@ from datetime import datetime, timedelta
 from enum import Enum, auto
 
 from raygent import TaskRunner
-from raygent.dtypes import BatchType
 from raygent.results.handlers import HandlerType
+
+T = TypeVar("T")
 
 
 class NodeStatus(Enum):
@@ -26,14 +27,14 @@ class RetryPolicy:
 
 
 @dataclass(slots=True)
-class WorkflowNode(Generic[BatchType, HandlerType]):
+class WorkflowNode(Generic[T, HandlerType]):
     """
     A single vertex in a Workflow DAG. Each node owns (or can lazily create)
     one `TaskRunner` that performs the underlying work.
     """
 
     name: str
-    runner: TaskRunner[BatchType, HandlerType]
+    runner: TaskRunner[T, HandlerType]
 
     retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
     kwargs_task: Mapping[str, Any] = field(default_factory=dict)
@@ -49,7 +50,7 @@ class WorkflowNode(Generic[BatchType, HandlerType]):
     results_ref: Any | None = field(init=False, default=None)
     input_ref: Any | None = field(init=False, default=None)
 
-    def resolve_runner(self) -> TaskRunner[BatchType, HandlerType]:
+    def resolve_runner(self) -> TaskRunner[T, HandlerType]:
         """Return the underlying runner.
 
         This is often used when validating types for edges.

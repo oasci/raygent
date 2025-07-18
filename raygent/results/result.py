@@ -1,18 +1,18 @@
-from typing import Generic
+from typing import Generic, TypeVar
 
 from dataclasses import dataclass
 
-from raygent.dtypes import OutputType
+T = TypeVar("T")
 
 
 @dataclass
-class Result(Generic[OutputType]):
-    value: OutputType | None
+class Result(Generic[T]):
+    value: T | None
     """Computed values returned by [`do()`][task.Task.do]."""
 
 
 @dataclass
-class IndexedResult(Result[OutputType]):
+class IndexedResult(Result[T]):
     """
     A Result with a batch index holding either a value or an error.
     """
@@ -22,9 +22,9 @@ class IndexedResult(Result[OutputType]):
 
 
 @dataclass
-class MeanResult(Result[OutputType]):
+class MeanResult(Result[T]):
     count: int
     """Number of values used in this mean"""
 
-    value: OutputType | None
+    value: T | None
     """Element-wise mean"""
