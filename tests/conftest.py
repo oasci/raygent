@@ -11,8 +11,9 @@ TEST_DIR = os.path.dirname(__file__)
 @pytest.fixture(scope="session", autouse=True)
 def setup_tests():
     enable_logging(10)
-    if not ray.is_initialized():
-        ray.init(runtime_env={})
+    ray.init(runtime_env={}, num_cpus=16, ignore_reinit_error=True)
+    yield
+    ray.shutdown()
 
 
 @pytest.fixture
