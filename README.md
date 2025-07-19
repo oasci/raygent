@@ -25,8 +25,8 @@ Raygent simplifies parallel execution in Python by providing an intuitive interf
 It removes boilerplate code and offers a modular approach to managing parallel tasks with directed acyclic graphs (DAG), making it easier to scale your workflow across multiple computational cores and nodes.
 
 > [!CAUTION]
-> raygent is under active development.
-> Breaking changes are likely to happen without warning.
+> Raygent is under active development.
+> Breaking changes are could happen without warning.
 
 ## Features
 
@@ -41,7 +41,7 @@ It removes boilerplate code and offers a modular approach to managing parallel t
 ### Define Tasks
 
 All workflows are built from raygent `Task`s that specify a specific, independent calculation.
-No `Task` can call another one and only one return is allowed; dictionaries should be used if multiple returns are needed.
+No `Task` can call another one, and only one return is allowed; dictionaries should be used if multiple returns are needed.
 
 ```python
 from typing import override
@@ -71,13 +71,13 @@ class SumTask(Task):
 Tasks are not limited to native Python; they can use NumPy arrays, Polars DataFrames, anything.
 
 > [!IMPORTANT]
-> DAG workflows do not enforce `Tasks.do()` to not perform their own multithreading.
-> This is a limitation of ray, so Take this into account when specifying resources for DAG nodes.
+> DAG workflows do not restrict `Tasks.do()` to a single thread; `Task`s could perform their own multithreading.
+> This is a limitation of ray, so take this into account when specifying resources for DAG nodes.
 
 ### Create DAG
 
 Here is an example directed acyclic graph (DAG) workflow.
-It creates two source queues (`souce_1` and `source_2`) that injects data using our `Task`s defined in the previous section.
+It creates two source queues (`source_1` and `source_2`) that inject data using our `Task`s defined in the previous section.
 
 ```text
 source_1 -> (PrefactorTask) --> (SquareTask)  --\
@@ -87,8 +87,8 @@ source_2 -----> (SquareTask) ------------------/
                         ----> sink_2
 ```
 
-This DAG also provides two sinks to receive messages from: `sink_1` is our final processed data and `sink_2` provides messages from intermediate ndoes.
-Do note that queues consume computational resources; adding an excessive number of sinks will reduce your workflow parallelization.
+This DAG also provides two sinks to receive messages from: `sink_1` is our final processed data, and `sink_2` provides messages from intermediate nodes.
+Do note that queues consume computational resources; adding an excessive number of sinks will reduce your workflow's parallelization.
 
 Below is how we build this DAG in raygent.
 
@@ -98,7 +98,7 @@ from raygent.workflow import DAG
 dag = DAG()
 
 # Add source nodes we can send data into the DAG
-# Returns a source node and queue
+# Returns a source node and a queue
 source_n1, source_1 = dag.add_source()
 source_n2, source_2 = dag.add_source()
 
@@ -120,7 +120,7 @@ sink_2 = dag.add_sink(square_n2)
 ### Stream DAG
 
 Injecting data into sources must be done with `DAG.stream()` to process data in batches.
-It will handling batching into source queues and returning messages from all sinks.
+It will handle batching into source queues and returning messages from all sinks.
 
 ```python
 data1 = [1, 2, 3, 4]  # For source_1
@@ -150,7 +150,7 @@ dag.stop()
 ```
 
 > [!TIP]
-> Sinks use queues (i.e., first-in, first-out); messages will not be in order they are sent.
+> Sinks use queues (i.e., first-in, first-out); messages will not be in the order they are sent.
 
 ## Installation
 
