@@ -74,8 +74,6 @@ comb_node = dag.add(CombineTask(), inputs=(square_node_1, square_node_2))
 sum_node = dag.add(SumTask(), inputs=(comb_node,))
 
 sink_queue = dag.add_sink(sum_node)
-
-dag.run()
 ```
 
 ### Stream DAG
@@ -91,6 +89,8 @@ expected = [[26, 40], [58, 80]]
 sources = (source_queue_1, source_queue_2)
 sinks = (sink_queue,)
 
+dag.run()
+
 for q_idx, msg in dag.stream(
     list1,
     list2,
@@ -100,6 +100,8 @@ for q_idx, msg in dag.stream(
     max_inflight=100,
 ):
     print(f"from sink #{q_idx}  ->  batch_idx={msg.index}, payload={msg.payload}")
+
+dag.stop()
 ```
 
 ## Installation
