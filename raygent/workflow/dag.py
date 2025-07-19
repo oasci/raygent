@@ -1,8 +1,9 @@
 """Minimalist DAG builder for deterministic, batch-synchronous stream processing."""
 
-from typing import TYPE_CHECKING, Any, Generator, TypeVar, Unpack, override
+from typing import TYPE_CHECKING, Any, TypeVar, override
 
-from collections.abc import Iterable, Sequence
+import time
+from collections.abc import Generator, Iterable, Sequence
 
 import ray
 from loguru import logger
@@ -60,7 +61,8 @@ class DAG:
         task: "Task",
         /,
         *,
-        inputs: Iterable[NodeHandle],
+        inputs: NodeHandle | Iterable[NodeHandle],
+        task_kwargs: dict[str, Any] | None = None,
         name: str | None = None,
         queue_size: int | None = None,
         n_workers: int = 1,
@@ -79,11 +81,16 @@ class DAG:
                 will send [`BatchMessage`][results.result.BatchMessage]s to this
                 `task`. If the [`Task`][task.Task] takes more than one positional
                 argument, the order of these `inputs` matters.
+            task_kwargs: Keyword arguments for [`do()`][task.Task.do] method. All
+                positional arguments are handled with queues.
             name: Optional symbolic name. If omitted, a unique one is
                 derived from the `task` class name and a UUID snippet.
             queue_size: Override for this node's incoming queues; defaults to
                 the builder-level [`_default_qsize`][workflow.dag.DAG._default_qsize].
-            n_workers: Maximum number of parallel workers for this node.
+            n_workers: Maximum number of parallel workers for this node (i.e., the
+                `max_concurrency` argument for ray).
+            n_cpu_per_worker: Number of CPU cores per individual workers (i.e., the
+                `num_cpus` argument for ray).
 
         Returns:
             A `NodeHandle` you can reference later when wiring children.
@@ -91,11 +98,17 @@ class DAG:
         if self._started:
             raise RuntimeError("Cannot add nodes after DAG has been started")
 
+        if task_kwargs is None:
+            task_kwargs = {}
+
+        if not isinstance(inputs, Iterable):
+            inputs = (inputs,)
+
         parents: list[NodeHandle] = list(inputs or [])
         n_inputs: int = len(parents)
         actor = TaskActor.options(
             num_cpus=n_cpu_per_worker, max_concurrency=n_workers
-        ).remote(task, n_inputs)
+        ).remote(task, n_inputs, task_kwargs=task_kwargs)
 
         self.n_cores_requested += n_workers
 
@@ -237,13 +250,13 @@ class DAG:
 
         return sink_queue
 
-    def run(self) -> None:
+    def start(self) -> None:
         """Start the main loop (`.run()`) on every added `TaskActor`."""
         if self._started:
             raise RuntimeError("DAG already running")
         self._started = True
         for handle in self._nodes.values():
-            handle.actor.run.remote()
+            handle.actor.start.remote()
 
     def stream(
         self,
@@ -253,32 +266,41 @@ class DAG:
         batch_size: int = 10,
         prebatched: bool = False,
         max_inflight: int = 16,
+        sink_wait: float = 0.01,
     ) -> Generator[tuple[int, BatchMessage], Any, None]:
         """Stream data into DAG through source queues and yields from sinks."""
         if not self._started:
             raise RuntimeError("DAG must be running before streaming")
 
+        if sink_wait <= 0.0:
+            raise ValueError("sink_wait must be greater than 0.0")
+
         batch_gen = batch_generator(
             *data_streams, batch_size=batch_size, prebatched=prebatched
         )
-        in_flight = 0
+        sent_batches = 0
+        yielded_messages = 0
+        num_sinks = len(sink_queues)
         sent_all = False
 
         def get_any() -> tuple[int, BatchMessage]:
             # try non‐blocking on all queues
-            for i, q in enumerate(sink_queues):
-                try:
-                    msg = q.get(block=False)
-                    return i, msg
-                except Exception:
-                    pass
-            # If none ready, block on the first one
-            msg = sink_queues[0].get()
-            return 0, msg
+            while True:
+                for i, q in enumerate(sink_queues):
+                    try:
+                        msg = q.get(block=False)
+                        return i, msg
+                    except Exception:
+                        continue
+                # nothing ready yet, back off briefly
+                time.sleep(sink_wait)
 
-        while not sent_all or in_flight > 0:
+        while not (sent_all and yielded_messages == sent_batches * num_sinks):
             # send as many as we can
-            while not sent_all and in_flight < max_inflight:
+            while (
+                not sent_all
+                and (sent_batches - (yielded_messages // num_sinks)) < max_inflight
+            ):
                 try:
                     idx, payloads = next(batch_gen)
                 except StopIteration:
@@ -286,12 +308,12 @@ class DAG:
                     break
                 for q, p in zip(source_queues, payloads):
                     q.put(BatchMessage(index=idx, payload=p))
-                in_flight += 1
+                sent_batches += 1
 
             # drain one result from ANY sink
             queue_idx, out_msg = get_any()
             yield queue_idx, out_msg
-            in_flight -= 1
+            yielded_messages += 1
 
     def stop(self) -> None:
         """Kill every actor in the DAG (best effort)."""

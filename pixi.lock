@@ -9757,13 +9757,13 @@ packages:
   requires_python: '>=3.9'
 - pypi: ./
   name: raygent
-  version: 0.1.dev63+g5b22fb5.d20250716130033
-  sha256: be5117431b993f6b167c7c05f561d0fbacd04e49d6c66c6c2c4cade2cd1297fc
+  version: 0.1.dev97+g693d963.d20250719165157
+  sha256: 438c3009d902f547b0ce34d899f414d4a0bab0715474c855053cf4469a54016f
   requires_dist:
   - loguru>=0.7.2,<1.0
   - numpy>=2.2.0,<3
   - polars>=1.15.0,<2
-  - ray>=2.10.0,<3 ; extra == 'ray'
+  - ray>=2.10.0,<3 ; extra == 'workflow'
   requires_python: '>=3.12'
   editable: true
 - conda: https://conda.anaconda.org/conda-forge/linux-64/readline-8.2-h8c095d6_2.conda

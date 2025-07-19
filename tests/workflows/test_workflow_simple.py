@@ -14,7 +14,7 @@ class SquareTask(Task):
 
 class PrefactorTask(Task):
     @override
-    def do(self, batch: list[int], factor: int = 2) -> list[int]:
+    def do(self, batch: list[int], factor: int = 1) -> list[int]:
         return [factor * x for x in batch]
 
 
@@ -47,7 +47,7 @@ def test_sum_task_functional() -> None:
     assert SumTask().do(batch) == [11, 22, 33]
 
 
-class _CombineTask(Task):
+class CombineTask(Task):
     """Merge two list batches into a dict so that `SumTask` can consume them."""
 
     @override
@@ -58,44 +58,61 @@ class _CombineTask(Task):
 def test_multi_node_dag_pipeline():
     """A three-stage pipeline exercising multi-input alignment & back-pressure.
 
-    Layout::
+    Layout:
 
-        list1 -> SquareTask    --\
-                                 CombineTask -> SumTask -> (q_out)
-        list2 -> SquareTask    --/
-
-    Expectations:
-        - `SumTask` outputs are deterministic & ordered (index 0,1,…).
-        - Bounded queues prevent uncontrolled growth (all set to size 2).
+        source_1 -> (PrefactorTask) --> (SquareTask)  --\
+                                                     (CombineTask) -> (SumTask) -> sink_1
+        source_2 -----> (SquareTask) ------------------/
+                                 |
+                                 ----> sink_2
     """
 
     dag = DAG()
 
-    source_1, q_1 = dag.add_source()
-    source_2, q_2 = dag.add_source()
+    # Add queues we can send data into the DAG
+    source_n1, source_1 = dag.add_source()
+    source_n2, source_2 = dag.add_source()
 
-    sq_1 = dag.add(SquareTask(), inputs=(source_1,))
-    sq_2 = dag.add(SquareTask(), inputs=(source_2,))
+    # Add fully-connected nodes to process our workflow
+    ## Top
+    prefactor_n = dag.add(PrefactorTask(), inputs=source_n1, task_kwargs={"factor": 2})
+    square_n1 = dag.add(SquareTask(), inputs=prefactor_n)
+    ## Bottom
+    square_n2 = dag.add(SquareTask(), inputs=source_n2)
+    ## Combined
+    comb = dag.add(CombineTask(), inputs=(square_n1, square_n2))
+    summed = dag.add(SumTask(), inputs=comb)
 
-    comb = dag.add(_CombineTask(), inputs=(sq_1, sq_2))
-    summed = dag.add(SumTask(), inputs=(comb,))
+    # Attach sinks to get data out of our workflow
     sink_1 = dag.add_sink(summed)
-    dag.run()
+    sink_2 = dag.add_sink(square_n2)
 
-    list1 = [1, 2, 3, 4]
-    list2 = [5, 6, 7, 8]
+    data1 = [1, 2, 3, 4]
+    data2 = [5, 6, 7, 8]
 
-    expected = [[26, 40], [58, 80]]
+    expected_sink1 = [[29, 52], [85, 128]]
+    expected_sink2 = [[25, 36], [49, 64]]
 
-    sources = (q_1, q_2)
-    sinks = (sink_1,)
-    for q_idx, msg in dag.stream(
-        list1,
-        list2,
+    sources = (source_1, source_2)
+    sinks = (sink_1, sink_2)
+
+    n_messages = 0
+    dag.start()
+    for sink_idx, msg in dag.stream(
+        data1,
+        data2,
         source_queues=sources,
         sink_queues=sinks,
         batch_size=2,
         max_inflight=4,
     ):
-        print(f"from sink #{q_idx}  ->  batch_idx={msg.index}, payload={msg.payload}")
-        assert expected[msg.index] == msg.payload
+        print(
+            f"from sink #{sink_idx}  ->  batch_idx={msg.index}, payload={msg.payload}"
+        )
+        n_messages += 1
+        if sink_idx == 0:
+            assert expected_sink1[msg.index] == msg.payload
+        if sink_idx == 1:
+            assert expected_sink2[msg.index] == msg.payload
+    dag.stop()
+    assert n_messages == 4

@@ -10,59 +10,114 @@ from raygent.workflow import BoundedQueue
 
 if TYPE_CHECKING:
     from ray.actor import ActorHandle
-    from ray.util.queue import Queue
 
     from raygent import Task
 
 
+@dataclass
+class QueueBuffer:
+    max_size: int = 64
+    """Maximum size allowed in buffer before we block queue get."""
+    _buffer: dict[int, BatchMessage] = field(default_factory=dict)
+    """Buffer of batch indices and their messages"""
+    _indices: list[int] = field(default_factory=list)
+
+    def add(self, message: BatchMessage) -> None:
+        idx: int = message.index
+        self._buffer[idx] = message
+        self._indices.append(message.index)
+
+    def pop(self, index: int) -> Any:
+        _ = self._indices.remove(index)
+        msg = self._buffer.pop(index)
+        return msg.payload
+
+    @property
+    def indices(self) -> list[int]:
+        return self._indices
+
+    @property
+    def size(self) -> int:
+        return len(self._indices)
+
+
 @ray.remote
 class TaskActor:
-    def __init__(self, task: "Task", num_inputs: int) -> None:
+    def __init__(
+        self, task: "Task", num_inputs: int, task_kwargs: dict[str, Any] | None = None
+    ) -> None:
         """
         Args:
-            task: The [`Task`][task.Task] this Actor is responsible for.
-            num_inputs: The number of inputs this `task` takes.
+            task: An initialized [`Task`][task.Task] this ray Actor is responsible for.
+            num_inputs: The number of inputs the `task` takes. This is used
+                to initialize [`buffers`][workflow.node.TaskActor.buffers].
+            task_kwargs: Keyword arguments for [`do()`][task.Task.do] method. All
+                positional arguments are handled with queues.
         """
         self.task: "Task" = task
-        self.num_inputs: int = num_inputs
-        self.input_queues: "list[Queue]" = []
-        self.buffers: list[dict[int, Any]] = [{} for _ in range(num_inputs)]
-        self.output_queues: "list[Queue]" = []
+        """An initialized [task][task.Task] this `TaskActor` will call when receiving
+        data in [`input_queues`][workflow.node.TaskActor.input_queues]."""
+        if task_kwargs is None:
+            task_kwargs = {}
+        self.task_kwargs: dict[str, Any] = task_kwargs
 
-    def register_input(self, queue: "Queue") -> None:
+        self.input_queues: list[BoundedQueue] = []
+        self.input_buffers: list[QueueBuffer] = []
+        self.output_queues: list[BoundedQueue] = []
+
+    def register_input(self, queue: "BoundedQueue", max_buffer_size: int = 64) -> None:
         """Register a source queue for an input of `task`"""
         self.input_queues.append(queue)
+        self.input_buffers.append(QueueBuffer(max_buffer_size))
 
-    def register_output(self, queue: "Queue") -> None:
-        """Register a sink queue for a `TaskActor` that consumes this output."""
+    def register_output(self, queue: "BoundedQueue") -> None:
+        """Register a sink queue for this `TaskActor` that consumes this output."""
         self.output_queues.append(queue)
 
-    def run(self) -> Never:
-        assert len(self.input_queues) == self.num_inputs
+    def _get_ready_batches(self, sort: bool = True) -> list[int]:
+        """Examine all input queue buffers and return a set of batch indices that
+        are common across all input queues.
 
+        Args:
+            sort: Sort batch indices are from smallest to largest.
+
+        Returns:
+            Batch indices present in source queue buffers that are ready to process.
+        """
+        common_idxs: set[int] = set(self.input_buffers[0].indices)
+        for buf in self.input_buffers[1:]:
+            common_idxs &= set(buf.indices)
+        ready_idxs: list[int] = list(common_idxs)
+        if sort:
+            ready_idxs = sorted(ready_idxs)
+        return ready_idxs
+
+    def _process_batch(self, idx: int) -> None:
+        batch = tuple(buf.pop(idx) for buf in self.input_buffers)
+        result = self.task.do(*batch, **self.task_kwargs)
+        msg = BatchMessage(index=idx, payload=result)
+        for out_q in self.output_queues:
+            out_q.put(msg)
+
+    def _buffer_next_message(self) -> None:
+        """Get next message from input queues and put them in buffer.
+
+        Will block the run loop until a message is received from the smallest buffer.
+        """
+        sizes = [buf.size for buf in self.input_buffers]
+        i = sizes.index(min(sizes))
+        msg: BatchMessage = self.input_queues[i].get()
+        self.input_buffers[i].add(msg)
+
+    def start(self) -> Never:
+        """Start an infinite loop waiting for batch messages in input queues."""
         while True:
-            # 1) See if any index is “ready” (in all buffers).
-            common_idxs = set(self.buffers[0].keys())
-            for buf in self.buffers[1:]:
-                common_idxs &= buf.keys()
-
-            if common_idxs:
-                # Process all ready indices in sorted order
-                for idx in sorted(common_idxs):
-                    batch = [buf.pop(idx) for buf in self.buffers]
-                    result = self.task.do(*batch)
-                    msg = BatchMessage(index=idx, payload=result)
-                    for out_q in self.output_queues:
-                        out_q.put(msg)
+            ready_batch_idxs = self._get_ready_batches()
+            if len(ready_batch_idxs) > 0:
+                for idx in ready_batch_idxs:
+                    self._process_batch(idx)
                 continue
-
-            # 2) If nothing is ready yet, fetch exactly one more message.
-            #    Choose the input whose buffer is smallest to balance reads.
-            sizes = [len(buf) for buf in self.buffers]
-            i = sizes.index(min(sizes))
-            # This will block only if that queue is empty; otherwise immediately
-            msg = self.input_queues[i].get()
-            self.buffers[i][msg.index] = msg.payload
+            self._buffer_next_message()
 
 
 @dataclass(slots=True, kw_only=True)
