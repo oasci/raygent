@@ -253,6 +253,8 @@ class DAG:
         """Start the main loop (`.run()`) on every added `TaskActor`."""
         if self._started:
             raise RuntimeError("DAG already running")
+        if not ray.is_initialized():
+            raise RuntimeError("You must initialize ray first; not starting the DAG")
         self._started = True
         for handle in self._nodes.values():
             handle.actor.start.remote()

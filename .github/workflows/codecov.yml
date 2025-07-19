@@ -20,16 +20,16 @@ jobs:
           lfs: true
 
       - name: Install pixi
-        uses: prefix-dev/setup-pixi@v0.8.1
+        uses: prefix-dev/setup-pixi@v0.8.12
 
       - name: Setup environment
-        run: pixi install
+        run: pixi install -e dev
 
       - name: Get test coverage
         run: pixi run tests
 
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           env_vars: OS,PYTHON
           fail_ci_if_error: true
