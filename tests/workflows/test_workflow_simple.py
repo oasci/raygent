@@ -79,7 +79,7 @@ def test_multi_node_dag_pipeline():
 
     comb = dag.add(_CombineTask(), inputs=(sq_1, sq_2))
     summed = dag.add(SumTask(), inputs=(comb,))
-    sink_1 = dag.add_sink((summed,))
+    sink_1 = dag.add_sink(summed)
     dag.run()
 
     list1 = [1, 2, 3, 4]

@@ -184,7 +184,7 @@ class DAG:
 
     def add_sink(
         self,
-        inputs: Iterable[NodeHandle],
+        input: NodeHandle,
         /,
         *,
         name: str | None = None,
@@ -193,9 +193,7 @@ class DAG:
         """Create a sink where data can be retrieved.
 
         Args:
-            task: An implementation of your [`Task`]task.Task] API.
-            sources: Zero or more source queues to attach.
-            inputs: Zero or more upstream `NodeHandle` objects.
+            input: An upstream `NodeHandle` objects.
             name: Optional symbolic name. If omitted, a unique one is
                 derived from the task class and a UUID snippet.
             queue_size: Override for *this node's* incoming queues; defaults to
@@ -209,21 +207,20 @@ class DAG:
             raise RuntimeError("Cannot add nodes after DAG has been started")
 
         task = IdentityTask()
-        parents: list[NodeHandle] = list(inputs or [])
-        n_inputs: int = len(parents)
-        actor = TaskActor.options(num_cpus=1, max_concurrency=1).remote(task, n_inputs)
+        actor = TaskActor.options(num_cpus=1, max_concurrency=1).remote(task, 1)
         self.n_cores_requested += 2
 
         inbound_queues: "list[BoundedQueue]" = []
         qsize = queue_size or self._default_qsize
-        for parent in parents:
-            q = BoundedQueue(qsize)
-            parent.actor.register_output.remote(q)
-            parent.outputs.append(q)
-            actor.register_input.remote(q)
-            inbound_queues.append(q)
 
-            self._edges[q.uid] = q
+        q = BoundedQueue(qsize)
+        input.actor.register_output.remote(q)
+        input.outputs.append(q)
+
+        actor.register_input.remote(q)
+        inbound_queues.append(q)
+
+        self._edges[q.uid] = q
 
         sink_queue: BoundedQueue = BoundedQueue(qsize)
         actor.register_output.remote(sink_queue)

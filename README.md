@@ -35,23 +35,71 @@ It removes boilerplate code and offers a modular approach to managing parallel t
 
 ## Quick Start
 
+### Define Tasks
+
 ```python
-from raygent import Task, TaskRunner
-from raygent.results.handlers import ResultsCollector
+from typing import override
+from raygent import Task
 
-# Define your task
 class SquareTask(Task):
-    def do(self, batch: list[float]):
-        return [item ** 2 for item in batch]
+    @override
+    def do(self, batch: list[float]) -> list[float]:
+        return [item ** 2.0 for item in batch]
 
-# Create a task runner
-runner = TaskRunner[
-    list[float], ResultsCollector[list[float]]
-](SquareTask, ResultsCollector, in_parallel=True)
+class CombineTask(Task):
+    @override
+    def do(self, a: list[float], b: list[float]) -> dict[str, list[float]]:
+        return {"a": a, "b": b}
 
-# Process items in parallel
-handler = runner.submit_tasks(batch=[1., 2., 3., 4., 5.])
-results = handler.get()  # [1., 4., 9., 16., 25.]
+class SumTask(Task):
+    @override
+    def do(self, batch: dict[str, list[float]]) -> list[float]:
+        return [a + b for a, b in zip(batch["a"], batch["b"])]
+```
+
+### Create DAG
+
+```python
+from raygent.workflow import DAG
+
+dag = DAG()
+
+source_node_1, source_queue_1 = dag.add_source()
+source_node_2, source_queue_2 = dag.add_source()
+
+square_node_1 = dag.add(SquareTask(), inputs=(source_node_1,))
+square_node_2 = dag.add(SquareTask(), inputs=(source_node_2,))
+
+comb_node = dag.add(CombineTask(), inputs=(square_node_1, square_node_2))
+sum_node = dag.add(SumTask(), inputs=(comb_node,))
+
+sink_queue = dag.add_sink(sum_node)
+
+dag.run()
+```
+
+### Stream DAG
+
+```python
+list1 = [1, 2, 3, 4]
+list2 = [5, 6, 7, 8]
+
+# 1^2 + 5^2 = 26
+# 2^2 + 6^2 = 40
+expected = [[26, 40], [58, 80]]
+
+sources = (source_queue_1, source_queue_2)
+sinks = (sink_queue,)
+
+for q_idx, msg in dag.stream(
+    list1,
+    list2,
+    source_queues=sources,
+    sink_queues=sinks,
+    batch_size=2,
+    max_inflight=100,
+):
+    print(f"from sink #{q_idx}  ->  batch_idx={msg.index}, payload={msg.payload}")
 ```
 
 ## Installation
