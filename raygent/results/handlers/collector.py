@@ -1,4 +1,4 @@
-from typing import Generic, override
+from typing import Generic, TypeVar, override
 
 from bisect import bisect_right
 from collections.abc import MutableSequence
@@ -6,27 +6,26 @@ from dataclasses import dataclass
 
 from loguru import logger
 
-from raygent.dtypes import OutputType
 from raygent.results import IndexedResult
 from raygent.results.handlers import ResultsHandler
 from raygent.savers import Saver
 
+T = TypeVar("T")
+
 
 @dataclass
-class ResultsBuffer(Generic[OutputType]):
+class ResultsBuffer(Generic[T]):
     indices: MutableSequence[int]
-    results: MutableSequence[OutputType]
+    results: MutableSequence[T]
 
 
-class ResultsCollector(ResultsHandler[OutputType]):
+class ResultsCollector(ResultsHandler[T]):
     """
-    Handler that accumulates `Result[OutputType]` instances and supports
+    Handler that accumulates `Result[T]` instances and supports
     periodic flush/save and final aggregation.
     """
 
-    def __init__(
-        self, saver: Saver[OutputType] | None = None, save_interval: int = 1
-    ) -> None:
+    def __init__(self, saver: Saver[T] | None = None, save_interval: int = 1) -> None:
         """
         Args:
             saver: An instance of a Saver responsible for persisting results. If None,
@@ -35,13 +34,13 @@ class ResultsCollector(ResultsHandler[OutputType]):
                 a save.
         """
         self.n_results: int = 0
-        self.buffer: ResultsBuffer[OutputType] = ResultsBuffer(indices=[], results=[])
+        self.buffer: ResultsBuffer[T] = ResultsBuffer(indices=[], results=[])
         super().__init__(saver, save_interval)
 
     @override
     def add_result(
         self,
-        result: IndexedResult[OutputType],
+        result: IndexedResult[T],
         *args: object,
         **kwargs: object,
     ) -> None:
@@ -83,7 +82,7 @@ class ResultsCollector(ResultsHandler[OutputType]):
         Persists a slice of the currently collected results if a saving interval
         has been met.
 
-        This method is typically called by a TaskManager after each batch is added.
+        This method is typically called by a TaskRunner after each batch is added.
         If a Saver is provided and the number of collected results meets or exceeds
         the specified save_interval, a slice of results is saved using the saver,
         and the saved results are removed from the in-memory collection.
@@ -99,6 +98,6 @@ class ResultsCollector(ResultsHandler[OutputType]):
         self._save()
 
     @override
-    def get(self) -> MutableSequence[OutputType]:
-        results: MutableSequence[OutputType] = self.buffer.results
+    def get(self) -> MutableSequence[T]:
+        results: MutableSequence[T] = self.buffer.results
         return results

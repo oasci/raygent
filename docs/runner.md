@@ -1,8 +1,8 @@
-# Manager
+# Runner
 
-[`TaskManager`][manager.TaskManager] is a class designed to efficiently manage task execution using **Ray's Task Parallelism**.
+[`TaskRunner`][runner.TaskRunner] is a class designed to efficiently manage task execution using **Ray's Task Parallelism**.
 It allows for seamless parallel execution of tasks while also supporting sequential execution when Ray is disabled.
-By handling task submission, worker management, and result collection, [`TaskManager`][manager.TaskManager] simplifies distributed processing workflows.
+By handling task submission, worker management, and result collection, [`TaskRunner`][runner.TaskRunner] simplifies distributed processing workflows.
 Some key features include:
 
 -   **Flexible Execution Modes**: Runs tasks either sequentially or in parallel using Ray.
@@ -13,20 +13,20 @@ Some key features include:
 
 ## Initialization
 
-The [`TaskManager`][manager.TaskManager] constructor initializes the execution environment and prepares task handling.
+The [`TaskRunner`][runner.TaskRunner] constructor initializes the execution environment and prepares task handling.
 
 ```python
-from raygent import TaskManager
+from raygent import TaskRunner
 from raygent.results.handlers import ResultsCollector
 from my_tasks import ExampleTask
 
-manager = TaskManager(ExampleTask, ResultsCollector, n_cores=4, in_parallel=True)
+runner = TaskRunner(ExampleTask, ResultsCollector, n_cores=4, in_parallel=True)
 ```
 
 ## Submitting Tasks
 
-Tasks are submitted using [`submit_tasks`][manager.TaskManager.submit_tasks], which divides data into batches and manages workers efficiently.
+Tasks are submitted using [`submit_tasks`][runner.TaskRunner.submit_tasks], which divides data into batches and manages workers efficiently.
 
 ```python
-manager.submit_tasks(data=[1, 2, 3, 4, 5], batch_size=2)
+runner.submit_tasks(data=[1, 2, 3, 4, 5], batch_size=2)
 ```

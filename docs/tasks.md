@@ -20,7 +20,7 @@ import numpy.typing as npt
 from raygent import Task
 
 
-class MeanTask(Task[npt.NDArray[np.float64], np.float64]):
+class MeanTask(Task[np.float64]):
     def do(self, batch: npt.NDArray[np.float64]) -> np.float64:
         return np.mean(items)
 

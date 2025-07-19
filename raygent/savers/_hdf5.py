@@ -48,9 +48,9 @@ class HDF5Saver(Saver):
         # Create an HDF5Saver for storing results
         saver = HDF5Saver("results.h5", dataset_name="experiment_1")
 
-        # Use with TaskManager
-        task_manager = TaskManager(MyTask, ResultsCollector)
-        task_manager.submit_tasks(batch, saver=saver, save_interval=100)
+        # Use with TaskRunner
+        task_runner = TaskRunner(MyTask, ResultsCollector)
+        task_runner.submit_tasks(batch, saver=saver, save_interval=100)
         ```
 
         Overwriting existing data:

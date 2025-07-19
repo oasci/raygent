@@ -1,7 +1,7 @@
 nav:
   - Home: index.md
   - Tasks: tasks.md
-  - Manager: manager.md
+  - Runner: runner.md
   - examples
   - API: api
   - Development: development.md

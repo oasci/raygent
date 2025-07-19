@@ -1,13 +1,14 @@
-from typing import override
+from typing import TypeVar, override
 
-from raygent.dtypes import NumericType
 from raygent.results import MeanResult
 from raygent.results.handlers import ResultsHandler
 from raygent.results.result import IndexedResult
 from raygent.savers import Saver
 
+T = TypeVar("T")
 
-class OnlineMeanResultsHandler(ResultsHandler[NumericType]):
+
+class OnlineMeanResultsHandler(ResultsHandler[T]):
     r"""
     `OnlineMeanResultsHandler` provides a numerically stable, online (incremental)
     algorithm to compute the arithmetic mean of large, streaming, or distributed
@@ -54,9 +55,7 @@ class OnlineMeanResultsHandler(ResultsHandler[NumericType]):
     batches sequentially.
     """
 
-    def __init__(
-        self, saver: Saver[NumericType] | None = None, save_interval: int = 1
-    ) -> None:
+    def __init__(self, saver: Saver[T] | None = None, save_interval: int = 1) -> None:
         """
         Args:
             saver: An instance of a Saver responsible for persisting results. If None,
@@ -65,7 +64,7 @@ class OnlineMeanResultsHandler(ResultsHandler[NumericType]):
                 a save.
         """
 
-        self.mean: NumericType | None = None
+        self.mean: T | None = None
         """
         The current global mean of all processed observations.
         """
@@ -79,7 +78,7 @@ class OnlineMeanResultsHandler(ResultsHandler[NumericType]):
     @override
     def add_result(
         self,
-        result: IndexedResult[MeanResult[NumericType]],
+        result: IndexedResult[MeanResult[T]],
         *args: object,
         **kwargs: object,
     ) -> None:
@@ -106,7 +105,7 @@ class OnlineMeanResultsHandler(ResultsHandler[NumericType]):
         self.total_count = new_total
 
     @override
-    def get(self) -> MeanResult[NumericType]:
+    def get(self) -> MeanResult[T]:
         """
         Retrieves the final computed global mean along with the total number of
         observations.
@@ -124,4 +123,4 @@ class OnlineMeanResultsHandler(ResultsHandler[NumericType]):
         """
         if self.mean is None or self.total_count == 0:
             raise ValueError("No data has been processed.")
-        return MeanResult[NumericType](value=self.mean, count=self.total_count)
+        return MeanResult[T](value=self.mean, count=self.total_count)
