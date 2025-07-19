@@ -9,9 +9,8 @@ from loguru import logger
 from .batch import batch_generator
 from .results import BatchMessage
 from .task import Task
-from .workflow import DAG
 
-__all__ = ["batch_generator", "BatchMessage", "Task", "DAG"]
+__all__ = ["batch_generator", "BatchMessage", "Task"]
 
 logger.disable("raygent")
 

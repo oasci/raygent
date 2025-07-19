@@ -2,7 +2,8 @@ from typing import override
 
 import pytest
 
-from raygent import DAG, BatchMessage, Task, batch_generator
+from raygent import Task
+from raygent.workflow import DAG
 
 
 class SquareTask(Task):
@@ -83,14 +84,18 @@ def test_multi_node_dag_pipeline():
 
     list1 = [1, 2, 3, 4]
     list2 = [5, 6, 7, 8]
-    batch_gen = batch_generator((list1, list2), batch_size=2)
-
-    for index, payloads in batch_gen:
-        q_1.put(BatchMessage(index=index, payload=payloads[0]))
-        q_2.put(BatchMessage(index=index, payload=payloads[1]))
 
     expected = [[26, 40], [58, 80]]
-    for idx in range(2):
-        msg = sink_1.get(timeout=5)
-        assert msg.index == idx
-        assert expected[idx] == msg.payload
+
+    sources = (q_1, q_2)
+    sinks = (sink_1,)
+    for q_idx, msg in dag.stream(
+        list1,
+        list2,
+        source_queues=sources,
+        sink_queues=sinks,
+        batch_size=2,
+        max_inflight=4,
+    ):
+        print(f"from sink #{q_idx}  ->  batch_idx={msg.index}, payload={msg.payload}")
+        assert expected[msg.index] == msg.payload

@@ -81,5 +81,4 @@ class NodeHandle:
 
     @override
     def __repr__(self) -> str:
-        cname = type(self.actor).__name__
-        return f"<NodeHandle {cname}[uid={self.uid}]>"
+        return f"<Node [uid={self.uid} in={self.inputs} out={self.outputs}]>"

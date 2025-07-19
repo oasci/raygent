@@ -1,5 +1,7 @@
 from typing import Any, override
 
+import uuid
+
 from ray.util.queue import Queue
 
 
@@ -17,8 +19,9 @@ class BoundedQueue(Queue):
     ) -> None:
         if maxsize <= 0:
             raise ValueError("maxsize must be positive")
+        self.uid: str = uuid.uuid4().hex[:8]
         super().__init__(maxsize=maxsize, actor_options=actor_options or {})
 
     @override
     def __repr__(self) -> str:
-        return f"<BoundedQueue maxsize={self.maxsize} size={self.qsize()}>"
+        return f"<BoundedQueue uid={self.uid}>"
