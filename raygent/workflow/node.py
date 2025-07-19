@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 import ray
 
-from raygent.results import BatchMessage
+from raygent.batch import BatchMessage
 from raygent.workflow import BoundedQueue
 
 if TYPE_CHECKING:

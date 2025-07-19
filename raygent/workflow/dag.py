@@ -8,8 +8,7 @@ from collections.abc import Generator, Iterable, Sequence
 import ray
 from loguru import logger
 
-from raygent.batch import batch_generator
-from raygent.results.result import BatchMessage
+from raygent.batch import BatchMessage, batch_generator
 from raygent.workflow import BoundedQueue, NodeHandle, TaskActor
 from raygent.workflow.helpers import IdentityTask
 
@@ -78,7 +77,7 @@ class DAG:
             task: An instance of your [`Task`][task.Task] API. This minimally should
                 have a [`do()`][task.Task.do] implementation.
             inputs: Upstream [`NodeHandle`][workflow.node.NodeHandle] objects that
-                will send [`BatchMessage`][results.result.BatchMessage]s to this
+                will send [`BatchMessage`][batch.BatchMessage]s to this
                 `task`. If the [`Task`][task.Task] takes more than one positional
                 argument, the order of these `inputs` matters.
             task_kwargs: Keyword arguments for [`do()`][task.Task.do] method. All

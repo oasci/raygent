@@ -1,3 +1,3 @@
-from .result import BatchMessage, Result, IndexedResult, MeanResult
+from .result import Result, IndexedResult, MeanResult
 
-__all__ = ["BatchMessage", "Result", "IndexedResult", "MeanResult"]
+__all__ = ["Result", "IndexedResult", "MeanResult"]

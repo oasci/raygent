@@ -6,8 +6,7 @@ from ast import literal_eval
 
 from loguru import logger
 
-from .batch import batch_generator
-from .results import BatchMessage
+from .batch import batch_generator, BatchMessage
 from .task import Task
 
 __all__ = ["batch_generator", "BatchMessage", "Task"]

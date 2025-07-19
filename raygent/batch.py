@@ -1,17 +1,24 @@
-from typing import TypeVarTuple, Unpack
+from typing import Any, TypeVarTuple, Unpack
 
 from collections.abc import Generator, Iterable
+from dataclasses import dataclass
 from itertools import islice
 
 Ts = TypeVarTuple("Ts")
 
 
+@dataclass
+class BatchMessage:
+    index: int
+    payload: Any
+
+
 def batch_generator(
-    *iterables: Unpack[tuple[Iterable[*Ts]]],
+    *iterables: Unpack[tuple[Iterable[Any]]],
     batch_size: int = 1,
     prebatched: bool = False,
     max_batches: int = 1_000_000_000,
-) -> Generator[tuple[int, tuple[list[*Ts], ...]], None, None]:
+) -> Generator[tuple[int, tuple[list[Any], ...]], None, None]:
     """
     Yields (batch_index, (slice1, slice2, …)), where each slice
     is up to `batch_size` items from the corresponding iterable.
@@ -40,7 +47,7 @@ def batch_generator(
     # otherwise: pull up to batch_size from each iterator, in lock‑step
     its = tuple(iter(it) for it in iterables)
     for idx in range(max_batches):
-        parts: list[list[*Ts]] = []
+        parts: list[list[Any]] = []
         for it in its:
             chunk = list(islice(it, batch_size))
             if not chunk:
