@@ -170,7 +170,8 @@ dag.stop()
 ```
 
 > [!TIP]
-> Sinks use queues (i.e., first-in, first-out); messages will not be in the order they are sent.
+> Sinks operate using a first-in, first-out (FIFO) queue.
+> Batches are processed when finished, not necessarily in the order they are sent into the DAG.
 
 ## Installation
 
