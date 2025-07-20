@@ -6,13 +6,13 @@
     <a href="https://github.com/oasci/raygent/actions/workflows/tests.yml">
         <img src="https://github.com/oasci/raygent/actions/workflows/tests.yml/badge.svg" alt="Build Status ">
     </a>
-    <!-- <img alt="PyPI - Python Version" src="https://img.shields.io/pypi/pyversions/raygent"> -->
+    <img alt="PyPI - Python Version" src="https://img.shields.io/pypi/pyversions/raygent">
     <a href="https://codecov.io/gh/oasci/raygent">
         <img src="https://codecov.io/gh/oasci/raygent/branch/main/graph/badge.svg" alt="codecov">
     </a>
-    <!-- <a href="https://github.com/oasci/raygent/releases">
+    <a href="https://github.com/oasci/raygent/releases">
         <img src="https://img.shields.io/github/v/release/oasci/raygent" alt="GitHub release (latest by date)">
-    </a> -->
+    </a>
     <a href="https://github.com/oasci/raygent/blob/main/LICENSE" target="_blank">
         <img src="https://img.shields.io/github/license/oasci/raygent" alt="License">
     </a>
@@ -38,13 +38,15 @@ It removes boilerplate code and offers a modular approach to managing parallel t
 
 ## Quick Start
 
-### Define Tasks
+### Defining Tasks
 
-All workflows are built from raygent `Task`s that specify a specific, independent calculation.
-No `Task` can call another one, and only one return is allowed; dictionaries should be used if multiple returns are needed.
+All workflows are built from raygent `Task`s that specify an independent calculation.
+At minimum, `Task`s must have a `do` method that performs the desired computation.
+Tasks are not limited to native Python; they can use NumPy arrays, Polars DataFrames, anything.
 
 ```python
 from typing import override
+
 from raygent import Task
 
 class SquareTask(Task):
@@ -68,23 +70,37 @@ class SumTask(Task):
         return [a + b for a, b in zip(batch["a"], batch["b"])]
 ```
 
-Tasks are not limited to native Python; they can use NumPy arrays, Polars DataFrames, anything.
+`Task`s must follow a few rules:
+
+- Positional arguments take batches of data, not a single element.
+- Only data can be passed through positional arguments; all other parameters must be specified with keyword arguments.
+- Each `Task` should represent an isolated computation (i.e., no `Task` can call another `Task`).
+- Internal multithreading in `do` methods should be explicitly annotated in the docstring.
+
+Abiding by these rules will make creating workflows with a `DAG` a breeze.
 
 > [!IMPORTANT]
 > DAG workflows do not restrict `Tasks.do()` to a single thread; `Task`s could perform their own multithreading.
 > This is a limitation of ray, so take this into account when specifying resources for DAG nodes.
 
-### Create DAG
+### Creating workflows
 
 Here is an example directed acyclic graph (DAG) workflow.
 It creates two source queues (`source_1` and `source_2`) that inject data using our `Task`s defined in the previous section.
 
-```text
-source_1 -> (PrefactorTask) --> (SquareTask)  --\
-                                        (CombineTask) -> (SumTask) -> sink_1
-source_2 -----> (SquareTask) ------------------/
-                        |
-                        ----> sink_2
+```mermaid
+flowchart LR
+    A[source_1] --> B((PrefactorTask))
+    B --> C((SquareTask))
+    D[source_2] --> E((SquareTask))
+
+    C --> F((CombineTask))
+    E --> F
+
+    F --> G((SumTask))
+
+    G --> I([sink_1])
+    E --> H([sink_2])
 ```
 
 This DAG also provides two sinks to receive messages from: `sink_1` is our final processed data, and `sink_2` provides messages from intermediate nodes.
@@ -117,7 +133,11 @@ sink_1 = dag.add_sink(summed)
 sink_2 = dag.add_sink(square_n2)
 ```
 
-### Stream DAG
+> [!NOTE]
+> All inputs to a node must be defined before adding the task to the DAG.
+> Defining nodes from source to sink helps prevent cycles.
+
+### Running workflows
 
 Injecting data into sources must be done with `DAG.stream()` to process data in batches.
 It will handle batching into source queues and returning messages from all sinks.
