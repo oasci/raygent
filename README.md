@@ -193,4 +193,5 @@ pixi shell
 
 ## License
 
-This project is released under the Apache-2.0 License as specified in `LICENSE.md`.
+This software is licensed under the **Prosperity Public License 3.0.0**.  
+See [LICENSE.md](https://github.com/scienting/raygent/blob/main/LICENSE.md) for full terms, including noncommercial use and 30-day commercial trial conditions.
