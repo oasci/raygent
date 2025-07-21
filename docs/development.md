@@ -11,7 +11,7 @@ Follow these precise steps to configure your development environment:
     Begin by obtaining a local copy of the `raygent` codebase:
 
     ```bash
-    git clone git@github.com:oasci/raygent.git
+    git clone git@github.com:scienting/raygent.git
     cd raygent
     ```
 2.  **Install dependencies:**

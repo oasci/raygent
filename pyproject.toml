@@ -2,10 +2,10 @@
 name = "raygent"
 description = "Parallelism, Delegated"
 authors = [
-    {name = "OASCI", email = "us@oasci.org"}
+    {name = "Scienting Studio", email = "us@scient.ing"}
 ]
 maintainers = [
-    {name = "Alex M. Maldonado", email = "alex.maldonado@pitt.edu"}
+    {name = "Alex Maldonado", email = "alex@scient.ing"}
 ]
 dynamic = ["version"]
 readme = "README.md"
@@ -33,10 +33,10 @@ workflow = [
 ]
 
 [project.urls]
-Documentation = "https://raygent.oasci.org"
-Repository = "https://github.com/oasci/raygent"
-Issues = "https://github.com/oasci/raygent/issues"
-Changelog = "https://github.com/oasci/raygent/blob/main/CHANGELOG.md"
+Documentation = "https://raygent.scient.ing"
+Repository = "https://github.com/scienting/raygent"
+Issues = "https://github.com/scienting/raygent/issues"
+Changelog = "https://github.com/scienting/raygent/blob/main/CHANGELOG.md"
 
 
 [build-system]

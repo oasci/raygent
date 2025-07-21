@@ -1,11 +1,11 @@
 docs_dir: docs
 
 site_name: raygent
-site_author: OASCI
+site_author: Scienting Studio
 
-repo_name: oasci/raygent
-repo_url: https://github.com/oasci/raygent
-copyright: <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> by OASCI
+repo_name: scienting/raygent
+repo_url: https://github.com/scienting/raygent
+copyright: <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> by Scienting Studio
 
 # https://squidfunk.github.io/mkdocs-material/
 theme:
@@ -104,7 +104,7 @@ plugins:
 
 hooks:
   - hooks/launchy.py
-colab_base_url: https://colab.research.google.com/github/oasci/raygent/blob/main/study
+colab_base_url: https://colab.research.google.com/github/scienting/raygent/blob/main/study
 
 
 extra:

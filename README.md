@@ -2,25 +2,6 @@
 
 <h4 align="center">Parallelism, Delegated</h4>
 
-<p align="center">
-    <a href="https://github.com/oasci/raygent/actions/workflows/tests.yml">
-        <img src="https://github.com/oasci/raygent/actions/workflows/tests.yml/badge.svg" alt="Build Status ">
-    </a>
-    <img alt="PyPI - Python Version" src="https://img.shields.io/pypi/pyversions/raygent">
-    <a href="https://codecov.io/gh/oasci/raygent">
-        <img src="https://codecov.io/gh/oasci/raygent/branch/main/graph/badge.svg" alt="codecov">
-    </a>
-    <a href="https://github.com/oasci/raygent/releases">
-        <img src="https://img.shields.io/github/v/release/oasci/raygent" alt="GitHub release (latest by date)">
-    </a>
-    <a href="https://github.com/oasci/raygent/blob/main/LICENSE" target="_blank">
-        <img src="https://img.shields.io/github/license/oasci/raygent" alt="License">
-    </a>
-    <a href="https://github.com/oasci/raygent/" target="_blank">
-        <img src="https://img.shields.io/github/repo-size/oasci/raygent" alt="GitHub repo size">
-    </a>
-</p>
-
 Raygent simplifies parallel execution in Python by providing an intuitive interface to Ray's distributed computing framework.
 It removes boilerplate code and offers a modular approach to managing parallel tasks with directed acyclic graphs (DAG), making it easier to scale your workflow across multiple computational cores and nodes.
 
@@ -175,11 +156,11 @@ dag.stop()
 
 ## Installation
 
-You can install `raygent` directly from the [GitHub repository](https://github.com/oasci/raygent).
-First, clone the [repository](https://github.com/oasci/raygent).
+You can install `raygent` directly from the [GitHub repository](https://github.com/scienting/raygent).
+First, clone the [repository](https://github.com/scienting/raygent).
 
 ```bash
-git clone git@github.com:oasci/raygent.git
+git clone git@github.com:scienting/raygent.git
 ```
 
 Install `raygent` using `pip` after moving into the directory.
