@@ -2,7 +2,7 @@
 name = "raygent"
 description = "Parallelism, Delegated"
 authors = [
-    "Scienting Studio <us@scient.ing>",
+    "Scientific Computing Studio <us@scient.ing>",
 ]
 channels = ["conda-forge"]
 platforms = ["linux-64", "osx-64", "osx-arm64"]

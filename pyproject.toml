@@ -2,7 +2,7 @@
 name = "raygent"
 description = "Parallelism, Delegated"
 authors = [
-    {name = "Scienting Studio", email = "us@scient.ing"}
+    {name = "Scientific Computing Studio", email = "us@scient.ing"}
 ]
 maintainers = [
     {name = "Alex Maldonado", email = "alex@scient.ing"}

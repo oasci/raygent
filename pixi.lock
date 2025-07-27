@@ -9757,8 +9757,8 @@ packages:
   requires_python: '>=3.9'
 - pypi: ./
   name: raygent
-  version: 0.1.dev74+gbf4f943.d20250721162311
-  sha256: 157a56d5b14cb2a8e9ba74c0062e7c38fc1fb9d0ed31483cafbb04f2edf10b8a
+  version: 0.1.dev78+gcf8a1c1.d20250727125652
+  sha256: afd0cdb866407a5d1d1050a6f5303af69cb5e1a0091ec780dab82387cfa01fd2
   requires_dist:
   - loguru>=0.7.2,<1.0
   - numpy>=2.2.0,<3

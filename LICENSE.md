@@ -1,6 +1,6 @@
 # The Prosperity Public License 3.0.0
 
-Contributor: Scienting Studio
+Contributor: Scientific Computing Studio
 
 Source Code: https://github.com/scienting/raygent
 
